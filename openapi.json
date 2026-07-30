@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "BMS Backend API",
+    "title": "SMS Backend API",
     "version": "1.0.0",
-    "description": "Auth API for Boutique Management System (owners + staff)"
+    "description": "Auth API for Store Management System (owners + staff)"
   },
   "servers": [
     { "url": "http://localhost:5000", "description": "Local server" }

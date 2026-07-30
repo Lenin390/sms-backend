@@ -1,4 +1,4 @@
-# BMS Backend — Phase 1 (Auth)
+# SMS Backend — Phase 1 (Auth)
 
 ## What's in this phase
 - Owner registration (creates Owner + their Shop together)
@@ -27,7 +27,7 @@ Copy the connection string they give you — it looks like:
 
 ### 3. Install dependencies
 ```
-cd bms-backend
+cd sms-backend
 npm install
 ```
 
@@ -55,7 +55,7 @@ This reads `prisma/schema.prisma` and creates the actual tables in your Postgres
 ```
 npm run dev
 ```
-You should see: `BMS backend running on http://localhost:5000`
+You should see: `SMS backend running on http://localhost:5000`
 
 ## Test it (use Postman, Insomnia, or curl)
 
@@ -69,7 +69,7 @@ Content-Type: application/json
   "email": "jane@example.com",
   "phone": "9998887777",
   "password": "SecurePass123",
-  "shopName": "Jane's Boutique",
+  "shopName": "Jane's Store",
   "shopAddress": "123 Main St"
 }
 ```

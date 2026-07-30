@@ -1,7 +1,7 @@
 {
-  "name": "bms-backend",
+  "name": "sms-backend",
   "version": "1.0.0",
-  "description": "Boutique Management System - Backend API",
+  "description": "Store Management System - Backend API",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
