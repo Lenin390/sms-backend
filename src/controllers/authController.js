@@ -6,6 +6,7 @@ const {
   signRefreshToken,
   verifyRefreshToken,
 } = require("../utils/token");
+const { withRetry, cleanupRegistrationArtifacts } = require("../utils/dbRetry");
 
 const SALT_ROUNDS = 12;
 
@@ -33,27 +34,40 @@ async function register(req, res) {
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-  // user and shop are created together in one transaction
-  const { user, shop } = await prisma.$transaction(async (tx) => {
-    const newUser = await tx.user.create({
-      data: { name, email, phone, passwordHash, role: "OWNER" },
-    });
+  let user;
+  let shop;
 
-    const newShop = await tx.shop.create({
-      data: {
-        ownerId: newUser.id,
-        name: shopName,
-        address: shopAddress || null,
-      },
-    });
+  try {
+    const newUser = await withRetry(() =>
+      prisma.user.create({
+        data: { name, email, phone, passwordHash, role: "OWNER" },
+      })
+    );
 
-    const updatedUser = await tx.user.update({
-      where: { id: newUser.id },
-      data: { shopId: newShop.id },
-    });
+    const newShop = await withRetry(() =>
+      prisma.shop.create({
+        data: {
+          ownerId: newUser.id,
+          name: shopName,
+          address: shopAddress || null,
+        },
+      })
+    );
 
-    return { user: updatedUser, shop: newShop };
-  });
+    user = await withRetry(() =>
+      prisma.user.update({
+        where: { id: newUser.id },
+        data: { shopId: newShop.id },
+      })
+    );
+    shop = newShop;
+  } catch (error) {
+    await cleanupRegistrationArtifacts(prisma, {
+      userId: user?.id,
+      shopId: shop?.id,
+    });
+    throw error;
+  }
 
   const tokenPayload = { id: user.id, shopId: shop.id, role: user.role };
   const accessToken = signAccessToken(tokenPayload);
