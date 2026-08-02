@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SMS Backend API",
-    "version": "1.0.0",
-    "description": "Auth API for Store Management System (owners + staff)"
+    "version": "1.1.0",
+    "description": "API for Store Management System - auth, employees, attendance, and payroll"
   },
   "servers": [
     { "url": "http://localhost:5000", "description": "Local server" }
@@ -85,16 +85,196 @@
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
+    },
+    "/api/employees": {
+      "post": {
+        "summary": "Create an employee",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "get": {
+        "summary": "List employees for the logged-in owner/manager's shop",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "active", "in": "query", "schema": { "type": "boolean" }, "description": "Filter by isActive" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of employees",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Employee" } } } }
+          }
+        }
+      }
+    },
+    "/api/employees/{id}": {
+      "get": {
+        "summary": "Get one employee",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
+        "responses": {
+          "200": { "description": "Employee", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "summary": "Update an employee",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "summary": "Deactivate an employee (soft delete)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
+        "responses": {
+          "200": { "description": "Deactivated" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/employees/{id}/grant-access": {
+      "post": {
+        "summary": "Give an employee login access (creates a linked User)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantAccessRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Access granted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantAccessResponse" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "Already has access" }
+        }
+      }
+    },
+    "/api/attendance/checkin": {
+      "post": {
+        "summary": "Check in for today (hourly employees)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeIdBody" } } }
+        },
+        "responses": {
+          "201": { "description": "Checked in", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } },
+          "409": { "description": "Already checked in today" }
+        }
+      }
+    },
+    "/api/attendance/checkout": {
+      "post": {
+        "summary": "Check out for today (hourly employees)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeIdBody" } } }
+        },
+        "responses": {
+          "200": { "description": "Checked out, hoursWorked calculated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } },
+          "400": { "description": "Haven't checked in yet" }
+        }
+      }
+    },
+    "/api/attendance/mark": {
+      "post": {
+        "summary": "Manually mark attendance (daily/weekly/monthly employees, or corrections)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MarkAttendanceRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Marked", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } }
+        }
+      }
+    },
+    "/api/attendance": {
+      "get": {
+        "summary": "List attendance history (own history if staff, anyone's if owner/manager)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "employeeId", "in": "query", "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Attendance records", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Attendance" } } } } }
+        }
+      }
+    },
+    "/api/payroll/preview": {
+      "post": {
+        "summary": "Calculate pay for a period without saving it",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPeriodRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Calculated breakdown", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPreview" } } } }
+        }
+      }
+    },
+    "/api/payroll/runs": {
+      "post": {
+        "summary": "Save a payroll run",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPeriodRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Run saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollRun" } } } }
+        }
+      },
+      "get": {
+        "summary": "List payroll runs",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "employeeId", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["DRAFT", "PAID"] } }
+        ],
+        "responses": {
+          "200": { "description": "Payroll runs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PayrollRun" } } } } }
+        }
+      }
+    },
+    "/api/payroll/runs/{id}/pay": {
+      "patch": {
+        "summary": "Mark a payroll run as paid",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Marked paid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollRun" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
     "securitySchemes": {
       "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
     },
+    "parameters": {
+      "EmployeeId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+    },
     "schemas": {
       "RegisterRequest": {
         "type": "object",
-        "required": ["name","email","phone","password","shopName"],
+        "required": ["name", "email", "phone", "password", "shopName"],
         "properties": {
           "name": { "type": "string" },
           "email": { "type": "string", "format": "email" },
@@ -116,7 +296,7 @@
       },
       "LoginRequest": {
         "type": "object",
-        "required": ["email","password"],
+        "required": ["email", "password"],
         "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string" } }
       },
       "LoginResponse": {
@@ -133,11 +313,122 @@
       "AccessTokenResponse": { "type": "object", "properties": { "accessToken": { "type": "string" } } },
       "UserSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "email": { "type": "string" }, "role": { "type": "string" } } },
       "ShopSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
-      "MeResponse": { "type": "object", "properties": { "message": { "type": "string" }, "auth": { "type": "object" } } }
+      "MeResponse": { "type": "object", "properties": { "message": { "type": "string" }, "auth": { "type": "object" } } },
+
+      "EmployeeRequest": {
+        "type": "object",
+        "required": ["name", "payType", "payRate"],
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "designation": { "type": "string" },
+          "payType": { "type": "string", "enum": ["HOURLY", "DAILY", "WEEKLY", "MONTHLY"] },
+          "payRate": { "type": "number" },
+          "joiningDate": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Employee": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "shopId": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "designation": { "type": "string" },
+          "payType": { "type": "string" },
+          "payRate": { "type": "number" },
+          "isActive": { "type": "boolean" },
+          "linkedUserId": { "type": "string", "nullable": true }
+        }
+      },
+      "GrantAccessRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "enum": ["MANAGER", "STAFF"] },
+          "password": { "type": "string", "description": "Optional - auto-generated if omitted" }
+        }
+      },
+      "GrantAccessResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/UserSummary" },
+          "temporaryPassword": { "type": "string", "description": "Only returned when password wasn't supplied - shown once" }
+        }
+      },
+
+      "EmployeeIdBody": {
+        "type": "object",
+        "properties": {
+          "employeeId": { "type": "string", "description": "Required for owner/manager, ignored for staff (uses their own)" }
+        }
+      },
+      "MarkAttendanceRequest": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "employeeId": { "type": "string" },
+          "date": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["PRESENT", "ABSENT", "HALF_DAY", "ON_LEAVE"] },
+          "notes": { "type": "string" }
+        }
+      },
+      "Attendance": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "employeeId": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "checkIn": { "type": "string", "format": "date-time", "nullable": true },
+          "checkOut": { "type": "string", "format": "date-time", "nullable": true },
+          "hoursWorked": { "type": "number", "nullable": true },
+          "status": { "type": "string" },
+          "notes": { "type": "string", "nullable": true }
+        }
+      },
+
+      "PayrollPeriodRequest": {
+        "type": "object",
+        "required": ["employeeId", "periodStart", "periodEnd"],
+        "properties": {
+          "employeeId": { "type": "string" },
+          "periodStart": { "type": "string", "format": "date-time" },
+          "periodEnd": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PayrollPreview": {
+        "type": "object",
+        "properties": {
+          "employee": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "payType": { "type": "string" } } },
+          "totalHours": { "type": "number" },
+          "daysPresent": { "type": "integer" },
+          "grossPay": { "type": "number" },
+          "netPay": { "type": "number" }
+        }
+      },
+      "PayrollRun": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "employeeId": { "type": "string" },
+          "periodStart": { "type": "string", "format": "date" },
+          "periodEnd": { "type": "string", "format": "date" },
+          "totalHours": { "type": "number", "nullable": true },
+          "daysPresent": { "type": "integer", "nullable": true },
+          "grossPay": { "type": "number" },
+          "netPay": { "type": "number" },
+          "status": { "type": "string", "enum": ["DRAFT", "PAID"] },
+          "paidOn": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      }
     },
     "responses": {
       "BadRequest": { "description": "Bad request", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } },
-      "Unauthorized": { "description": "Unauthorized", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } }
+      "Unauthorized": { "description": "Unauthorized", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } },
+      "Forbidden": { "description": "Forbidden - insufficient role", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } },
+      "NotFound": { "description": "Not found", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } }
     }
   }
 }

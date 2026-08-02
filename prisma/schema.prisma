@@ -14,7 +14,9 @@ model Shop {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   owner     User     @relation("ShopOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  staff     User[]   @relation("ShopStaff")
+  staff User[] @relation("ShopStaff")
+
+  employees Employee[]
 
   @@map("shops")
 }
@@ -32,6 +34,7 @@ model User {
   shopId       String?
   ownedShop    Shop?    @relation("ShopOwner")
   shop         Shop?    @relation("ShopStaff", fields: [shopId], references: [id], onDelete: Cascade)
+  employee Employee?
 
   @@map("users")
 }
@@ -40,4 +43,83 @@ enum Role {
   OWNER
   MANAGER
   STAFF
+}
+
+model Employee {
+  id          String   @id @default(uuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  phone       String?
+  designation String?
+  payType     PayType  @default(MONTHLY)
+  payRate     Float
+  joiningDate DateTime @default(now())
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Only set if employee also has a login (e.g. a manager). Most won't.
+  linkedUserId String? @unique
+  linkedUser   User?   @relation(fields: [linkedUserId], references: [id])
+
+  attendance  Attendance[]
+  payrollRuns PayrollRun[]
+
+  @@map("employees")
+}
+
+enum PayType {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Attendance {
+  id          String           @id @default(uuid())
+  employeeId  String
+  employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date        DateTime         @db.Date
+  checkIn     DateTime?
+  checkOut    DateTime?
+  hoursWorked Float?
+  status      AttendanceStatus @default(PRESENT)
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([employeeId, date]) // can't have two attendance entries for the same day
+  @@map("attendance")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+}
+
+// One row per employee per pay period, created when payroll is actually run
+model PayrollRun {
+  id          String        @id @default(uuid())
+  employeeId  String
+  employee    Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  periodStart DateTime      @db.Date
+  periodEnd   DateTime      @db.Date
+  totalHours  Float?
+  daysPresent Int?
+  grossPay    Float
+  netPay      Float
+  status      PayrollStatus @default(DRAFT)
+  paidOn      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("payroll_runs")
+}
+
+enum PayrollStatus {
+  DRAFT
+  PAID
 }

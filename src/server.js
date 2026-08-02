@@ -6,6 +6,9 @@ const openapi = require("../openapi.json");
 const { errorHandler } = require("./middleware/errorHandler");
 const authRoutes = require("./routes/authRoutes");
 const meRoutes = require("./routes/meRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
+const attendanceRoutes = require("./routes/attendanceRoutes");
+const payrollRoutes = require("./routes/payrollRoutes");
 
 const app = express();
 
@@ -23,6 +26,9 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/me", meRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
