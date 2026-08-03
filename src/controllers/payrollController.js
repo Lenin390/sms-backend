@@ -30,11 +30,9 @@ async function getEmployeeAndAttendance(shopId, employeeId, periodStart, periodE
 
 // Calculates pay without saving anything - lets the owner sanity check numbers first
 async function previewPayroll(req, res) {
-  const parsed = periodSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
-  const { employeeId, periodStart, periodEnd } = parsed.data;
+  const data = validateRequest(req, res, periodSchema);
+  if (!data) return;
+  const { employeeId, periodStart, periodEnd } = data;
 
   const { employee, attendanceRecords } = await getEmployeeAndAttendance(
     req.auth.shopId,
@@ -49,11 +47,9 @@ async function previewPayroll(req, res) {
 
 // Actually saves the payroll run
 async function createPayrollRun(req, res) {
-  const parsed = periodSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
-  const { employeeId, periodStart, periodEnd } = parsed.data;
+  const data = validateRequest(req, res, periodSchema);
+  if (!data) return;
+  const { employeeId, periodStart, periodEnd } = data;
 
   const { employee, attendanceRecords } = await getEmployeeAndAttendance(
     req.auth.shopId,

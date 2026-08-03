@@ -1,6 +1,7 @@
 const { z } = require("zod");
 const prisma = require("../config/db");
 const { resolveEmployeeId } = require("../utils/employeeScope");
+const { validateRequest } = require("../utils/validation");
 
 function startOfDay(date) {
   const d = new Date(date);
@@ -63,13 +64,11 @@ const markSchema = z.object({
 // For daily/weekly/monthly employees who don't clock in - also doubles as
 // a correction tool for owners/managers.
 async function markAttendance(req, res) {
-  const parsed = markSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
+  const data = validateRequest(req, res, markSchema);
+  if (!data) return;
 
-  const employeeId = await resolveEmployeeId(req.auth, parsed.data.employeeId);
-  const date = startOfDay(parsed.data.date || new Date());
+  const employeeId = await resolveEmployeeId(req.auth, data.employeeId);
+  const date = startOfDay(data.date || new Date());
 
   const record = await prisma.attendance.upsert({
     where: { employeeId_date: { employeeId, date } },

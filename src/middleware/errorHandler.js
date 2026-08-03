@@ -2,8 +2,8 @@ function errorHandler(err, req, res, next) {
   console.error(err);
 
   if (err.code === "P2002") {
-    const field = err.meta?.target?.[0] || "field";
-    return res.status(409).json({ error: `That ${field} is already in use` });
+    const field = err.meta?.target?.[0] || "email";
+    return res.status(409).json({ error: `user is already registered with this ${field}` });
   }
 
   const status = err.status || 500;

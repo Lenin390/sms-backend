@@ -7,6 +7,7 @@ const {
   verifyRefreshToken,
 } = require("../utils/token");
 const { withRetry, cleanupRegistrationArtifacts } = require("../utils/dbRetry");
+const { validateRequest } = require("../utils/validation");
 
 const SALT_ROUNDS = 12;
 
@@ -26,11 +27,9 @@ const loginSchema = z.object({
 
 // Register an owner and their shop together
 async function register(req, res) {
-  const parsed = registerSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
-  const { name, email, phone, password, shopName, shopAddress } = parsed.data;
+  const data = validateRequest(req, res, registerSchema);
+  if (!data) return;
+  const { name, email, phone, password, shopName, shopAddress } = data;
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
@@ -75,7 +74,7 @@ async function register(req, res) {
 
   res.status(201).json({
     message: "Registered successfully",
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
     shop: { id: shop.id, name: shop.name },
     accessToken,
     refreshToken,
@@ -84,13 +83,14 @@ async function register(req, res) {
 
 // Login handles all roles the same way
 async function login(req, res) {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
-  const { email, password } = parsed.data;
+  const data = validateRequest(req, res, loginSchema);
+  if (!data) return;
+  const { email, password } = data;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { shop: { select: { id: true, name: true } } },
+  });
 
   // never expose whether the user exists
   if (!user || !user.isActive) {
@@ -108,8 +108,8 @@ async function login(req, res) {
 
   res.json({
     message: "Logged in successfully",
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    shop: { id: user.shopId },
+    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+    shop: { id: user.shopId, name: user.shop?.name ?? null },
     accessToken,
     refreshToken,
   });

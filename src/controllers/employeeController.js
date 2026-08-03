@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const prisma = require("../config/db");
+const { validateRequest } = require("../utils/validation");
 
 const employeeSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -11,13 +12,11 @@ const employeeSchema = z.object({
 });
 
 async function createEmployee(req, res) {
-  const parsed = employeeSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
+  const data = validateRequest(req, res, employeeSchema);
+  if (!data) return;
 
   const employee = await prisma.employee.create({
-    data: { ...parsed.data, shopId: req.auth.shopId },
+    data: { ...data, shopId: req.auth.shopId },
   });
 
   res.status(201).json(employee);
@@ -50,10 +49,8 @@ async function getEmployee(req, res) {
 }
 
 async function updateEmployee(req, res) {
-  const parsed = employeeSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
+  const data = validateRequest(req, res, employeeSchema.partial());
+  if (!data) return;
 
   // findFirst first so we don't accidentally update an employee from another shop
   const existing = await prisma.employee.findFirst({
@@ -99,10 +96,8 @@ const grantAccessSchema = z.object({
 
 // Separate from createEmployee on purpose - most employees never need this.
 async function grantLoginAccess(req, res) {
-  const parsed = grantAccessSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.errors[0].message });
-  }
+  const data = validateRequest(req, res, grantAccessSchema);
+  if (!data) return;
 
   const employee = await prisma.employee.findFirst({
     where: { id: req.params.id, shopId: req.auth.shopId },
