@@ -93,7 +93,7 @@ async function markPayrollPaid(req, res) {
     where: { id: req.params.id, employee: { shopId: req.auth.shopId } },
   });
   if (!run) {
-    return res.status(404).json({ error: "Payroll run not found" });
+    return res.status(404).json({ success: false, message: "Payroll run not found" });
   }
 
   const updated = await prisma.payrollRun.update({

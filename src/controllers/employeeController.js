@@ -42,7 +42,7 @@ async function getEmployee(req, res) {
   });
 
   if (!employee) {
-    return res.status(404).json({ error: "Employee not found" });
+    return res.status(404).json({ success: false, message: "Employee not found" });
   }
 
   res.json(employee);
@@ -57,12 +57,12 @@ async function updateEmployee(req, res) {
     where: { id: req.params.id, shopId: req.auth.shopId },
   });
   if (!existing) {
-    return res.status(404).json({ error: "Employee not found" });
+    return res.status(404).json({ success: false, message: "Employee not found" });
   }
 
   const updated = await prisma.employee.update({
     where: { id: existing.id },
-    data: parsed.data,
+    data,
   });
 
   res.json(updated);
@@ -74,7 +74,7 @@ async function deactivateEmployee(req, res) {
     where: { id: req.params.id, shopId: req.auth.shopId },
   });
   if (!existing) {
-    return res.status(404).json({ error: "Employee not found" });
+    return res.status(404).json({ success: false, message: "Employee not found" });
   }
 
   await prisma.employee.update({
@@ -103,14 +103,14 @@ async function grantLoginAccess(req, res) {
     where: { id: req.params.id, shopId: req.auth.shopId },
   });
   if (!employee) {
-    return res.status(404).json({ error: "Employee not found" });
+    return res.status(404).json({ success: false, message: "Employee not found" });
   }
   if (employee.linkedUserId) {
-    return res.status(409).json({ error: "This employee already has login access" });
+    return res.status(409).json({ success: false, message: "This employee already has login access" });
   }
 
-  const { email, role } = parsed.data;
-  const tempPassword = parsed.data.password || crypto.randomBytes(6).toString("hex");
+  const { email, role } = data;
+  const tempPassword = data.password || crypto.randomBytes(6).toString("hex");
   const passwordHash = await bcrypt.hash(tempPassword, 12);
 
   const user = await prisma.user.create({

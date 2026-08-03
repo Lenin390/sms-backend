@@ -94,12 +94,12 @@ async function login(req, res) {
 
   // never expose whether the user exists
   if (!user || !user.isActive) {
-    return res.status(401).json({ error: "Invalid email or password" });
+    return res.status(401).json({ success: false, message: "Invalid email or password" });
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
   if (!isMatch) {
-    return res.status(401).json({ error: "Invalid email or password" });
+    return res.status(401).json({ success: false, message: "Invalid email or password" });
   }
 
   const tokenPayload = { id: user.id, shopId: user.shopId, role: user.role };
@@ -119,7 +119,7 @@ async function login(req, res) {
 async function refresh(req, res) {
   const { refreshToken } = req.body;
   if (!refreshToken) {
-    return res.status(400).json({ error: "Refresh token required" });
+    return res.status(400).json({ success: false, message: "Refresh token required" });
   }
 
   try {
@@ -128,7 +128,7 @@ async function refresh(req, res) {
     const accessToken = signAccessToken({ id, shopId, role });
     res.json({ accessToken });
   } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired refresh token" });
+    return res.status(401).json({ success: false, message: "Invalid or expired refresh token" });
   }
 }
 

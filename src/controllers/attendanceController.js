@@ -17,7 +17,7 @@ async function checkIn(req, res) {
     where: { employeeId_date: { employeeId, date: today } },
   });
   if (existing?.checkIn) {
-    return res.status(409).json({ error: "Already checked in today" });
+    return res.status(409).json({ success: false, message: "Already checked in today" });
   }
 
   const record = await prisma.attendance.upsert({
@@ -37,10 +37,10 @@ async function checkOut(req, res) {
     where: { employeeId_date: { employeeId, date: today } },
   });
   if (!record || !record.checkIn) {
-    return res.status(400).json({ error: "You haven't checked in today" });
+    return res.status(400).json({ success: false, message: "You haven't checked in today" });
   }
   if (record.checkOut) {
-    return res.status(409).json({ error: "Already checked out today" });
+    return res.status(409).json({ success: false, message: "Already checked out today" });
   }
 
   const checkOutTime = new Date();
