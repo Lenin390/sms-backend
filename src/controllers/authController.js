@@ -125,8 +125,26 @@ async function refresh(req, res) {
   try {
     const decoded = verifyRefreshToken(refreshToken);
     const { id, shopId, role } = decoded;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: { shop: { select: { id: true, name: true } } },
+    });
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Invalid or expired refresh token" });
+    }
+
     const accessToken = signAccessToken({ id, shopId, role });
-    res.json({ accessToken });
+    const refreshAccessToken = signRefreshToken({ id, shopId, role });
+
+    res.json({
+      message: "Token refreshed successfully",
+      user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+      shop: { id: user.shopId, name: user.shop?.name ?? null },
+      accessToken,
+      refreshToken: refreshAccessToken,
+    });
   } catch (err) {
     return res.status(401).json({ success: false, message: "Invalid or expired refresh token" });
   }

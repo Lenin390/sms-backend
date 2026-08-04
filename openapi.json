@@ -70,7 +70,10 @@
           }
         },
         "responses": {
-          "200": { "description": "New access token", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccessTokenResponse" } } } },
+          "200": {
+            "description": "Token refreshed successfully",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshResponse" } } }
+          },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -287,11 +290,11 @@
       "RegisterResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
+          "message": { "type": "string", "example": "Registered successfully" },
           "user": { "$ref": "#/components/schemas/UserSummary" },
           "shop": { "$ref": "#/components/schemas/ShopSummary" },
-          "accessToken": { "type": "string" },
-          "refreshToken": { "type": "string" }
+          "accessToken": { "type": "string", "example": "jwt.access.token" },
+          "refreshToken": { "type": "string", "example": "jwt.refresh.token" }
         }
       },
       "LoginRequest": {
@@ -302,17 +305,48 @@
       "LoginResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
+          "message": { "type": "string", "example": "Logged in successfully" },
           "user": { "$ref": "#/components/schemas/UserSummary" },
-          "shop": { "type": "object", "properties": { "id": { "type": "string" } } },
-          "accessToken": { "type": "string" },
-          "refreshToken": { "type": "string" }
+          "shop": { "$ref": "#/components/schemas/ShopSummary" },
+          "accessToken": { "type": "string", "example": "jwt.access.token" },
+          "refreshToken": { "type": "string", "example": "jwt.refresh.token" }
         }
       },
       "RefreshRequest": { "type": "object", "required": ["refreshToken"], "properties": { "refreshToken": { "type": "string" } } },
-      "AccessTokenResponse": { "type": "object", "properties": { "accessToken": { "type": "string" } } },
-      "UserSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "email": { "type": "string" }, "role": { "type": "string" } } },
-      "ShopSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
+      "RefreshResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string", "example": "Token refreshed successfully" },
+          "user": { "$ref": "#/components/schemas/UserSummary" },
+          "shop": { "$ref": "#/components/schemas/ShopSummary" },
+          "accessToken": { "type": "string", "example": "jwt.access.token" },
+          "refreshToken": { "type": "string", "example": "jwt.refresh.token" }
+        }
+      },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "usr_123" },
+          "name": { "type": "string", "example": "John Doe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "phone": { "type": "string", "nullable": true, "example": "+1234567890" },
+          "role": { "type": "string", "example": "OWNER" }
+        }
+      },
+      "ShopSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "shop_123" },
+          "name": { "type": "string", "example": "My Shop" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Invalid email or password" }
+        }
+      },
       "MeResponse": { "type": "object", "properties": { "message": { "type": "string" }, "auth": { "type": "object" } } },
 
       "EmployeeRequest": {
@@ -425,10 +459,11 @@
       }
     },
     "responses": {
-      "BadRequest": { "description": "Bad request", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } },
-      "Unauthorized": { "description": "Unauthorized", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } },
-      "Forbidden": { "description": "Forbidden - insufficient role", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } },
-      "NotFound": { "description": "Not found", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } }
+      "BadRequest": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "Unauthorized": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "Forbidden": { "description": "Forbidden - insufficient role", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "NotFound": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "Conflict": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
     }
   }
 }
