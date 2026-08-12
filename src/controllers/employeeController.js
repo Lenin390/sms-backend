@@ -133,7 +133,7 @@ async function grantLoginAccess(req, res) {
     success: true,
     message: "Login access granted",
     user: { id: user.id, email: user.email, role: user.role },
-    temporaryPassword: parsed.data.password ? undefined : tempPassword,     // only return if we generated it
+    temporaryPassword: data.password ? undefined : tempPassword, // only return if we generated it
   });
 }
 
