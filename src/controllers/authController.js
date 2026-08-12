@@ -73,6 +73,7 @@ async function register(req, res) {
   const refreshToken = signRefreshToken(tokenPayload);
 
   res.status(201).json({
+    success: true,
     message: "Registered successfully",
     user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
     shop: { id: shop.id, name: shop.name },
@@ -107,6 +108,7 @@ async function login(req, res) {
   const refreshToken = signRefreshToken(tokenPayload);
 
   res.json({
+    success: true,
     message: "Logged in successfully",
     user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
     shop: { id: user.shopId, name: user.shop?.name ?? null },
@@ -139,6 +141,7 @@ async function refresh(req, res) {
     const refreshAccessToken = signRefreshToken({ id, shopId, role });
 
     res.json({
+      success: true,
       message: "Token refreshed successfully",
       user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
       shop: { id: user.shopId, name: user.shop?.name ?? null },

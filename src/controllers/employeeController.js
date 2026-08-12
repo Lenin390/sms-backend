@@ -82,7 +82,7 @@ async function deactivateEmployee(req, res) {
     data: { isActive: false },
   });
 
-  res.json({ message: "Employee deactivated" });
+  res.json({ success: true, message: "Employee deactivated" });
 }
 
 const bcrypt = require("bcrypt");
@@ -130,10 +130,10 @@ async function grantLoginAccess(req, res) {
   });
 
   res.status(201).json({
+    success: true,
     message: "Login access granted",
     user: { id: user.id, email: user.email, role: user.role },
-    // only returned here, this one time - make sure the owner shares it securely
-    temporaryPassword: parsed.data.password ? undefined : tempPassword,
+    temporaryPassword: parsed.data.password ? undefined : tempPassword,     // only return if we generated it
   });
 }
 

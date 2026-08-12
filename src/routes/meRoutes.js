@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get("/", requireAuth, (req, res) => {
   res.json({
+    success: true,
     message: "You are authenticated",
     auth: req.auth,
   });
