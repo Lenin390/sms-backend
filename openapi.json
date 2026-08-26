@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SMS Backend API",
-    "version": "1.1.0",
-    "description": "API for Store Management System - auth, employees, attendance, and payroll"
+    "version": "1.2.0",
+    "description": "API for Store Management System - auth, employees, attendance, payroll, orders, and work assignments"
   },
   "servers": [
     { "url": "http://localhost:5000", "description": "Local server" }
@@ -265,6 +265,107 @@
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
+    },
+    "/api/orders": {
+      "post": {
+        "summary": "Create an order",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      },
+      "get": {
+        "summary": "List orders for the shop",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "READY", "DELIVERED", "CANCELLED"] } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Orders", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "summary": "Get one order with its assignments",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+        "responses": {
+          "200": { "description": "Order", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderWithAssignments" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "summary": "Update an order (details or status)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderUpdateRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/orders/{orderId}/assignments": {
+      "post": {
+        "summary": "Assign an employee to work on this order",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/OrderIdParam" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Assigned", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "get": {
+        "summary": "List assignments for this order",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/OrderIdParam" }],
+        "responses": {
+          "200": { "description": "Assignments", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } } }
+        }
+      }
+    },
+    "/api/assignments": {
+      "get": {
+        "summary": "List assignments (own tasks if staff, all shop tasks if owner/manager)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "employeeId", "in": "query", "schema": { "type": "string" } },
+          { "name": "orderId", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "DONE"] } }
+        ],
+        "responses": {
+          "200": { "description": "Assignments", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } } }
+        }
+      }
+    },
+    "/api/assignments/{id}": {
+      "patch": {
+        "summary": "Update an assignment (staff can only update their own status)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentUpdateRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -272,7 +373,9 @@
       "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
     },
     "parameters": {
-      "EmployeeId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+      "EmployeeId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+      "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+      "OrderIdParam": { "name": "orderId", "in": "path", "required": true, "schema": { "type": "string" } }
     },
     "schemas": {
       "RegisterRequest": {
@@ -455,6 +558,77 @@
           "netPay": { "type": "number" },
           "status": { "type": "string", "enum": ["DRAFT", "PAID"] },
           "paidOn": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+
+      "OrderRequest": {
+        "type": "object",
+        "required": ["clientName", "clientPhone", "deliveryDate", "amount"],
+        "properties": {
+          "clientName": { "type": "string" },
+          "clientPhone": { "type": "string" },
+          "instructions": { "type": "string" },
+          "deliveryDate": { "type": "string", "format": "date-time" },
+          "amount": { "type": "number" },
+          "advancePayment": { "type": "number" }
+        }
+      },
+      "OrderUpdateRequest": {
+        "allOf": [
+          { "$ref": "#/components/schemas/OrderRequest" },
+          { "type": "object", "properties": { "status": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "READY", "DELIVERED", "CANCELLED"] } } }
+        ]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "shopId": { "type": "string" },
+          "clientName": { "type": "string" },
+          "clientPhone": { "type": "string" },
+          "instructions": { "type": "string", "nullable": true },
+          "deliveryDate": { "type": "string", "format": "date-time" },
+          "amount": { "type": "number" },
+          "advancePayment": { "type": "number" },
+          "balance": { "type": "number" },
+          "status": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "READY", "DELIVERED", "CANCELLED"] }
+        }
+      },
+      "OrderWithAssignments": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Order" },
+          { "type": "object", "properties": { "assignments": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } }
+        ]
+      },
+      "AssignmentRequest": {
+        "type": "object",
+        "required": ["employeeId", "task"],
+        "properties": {
+          "employeeId": { "type": "string" },
+          "task": { "type": "string" },
+          "dueDate": { "type": "string", "format": "date-time" },
+          "notes": { "type": "string" }
+        }
+      },
+      "AssignmentUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "DONE"] },
+          "dueDate": { "type": "string", "format": "date-time" },
+          "notes": { "type": "string" }
+        }
+      },
+      "Assignment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "orderId": { "type": "string" },
+          "employeeId": { "type": "string" },
+          "task": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "DONE"] },
+          "dueDate": { "type": "string", "format": "date-time", "nullable": true },
+          "notes": { "type": "string", "nullable": true }
         }
       }
     },

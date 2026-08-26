@@ -72,8 +72,8 @@ async function markAttendance(req, res) {
 
   const record = await prisma.attendance.upsert({
     where: { employeeId_date: { employeeId, date } },
-    create: { employeeId, date, status: parsed.data.status, notes: parsed.data.notes },
-    update: { status: parsed.data.status, notes: parsed.data.notes },
+    create: { employeeId, date, status: data.status, notes: data.notes },
+    update: { status: data.status, notes: data.notes },
   });
 
   res.json(record);

@@ -1,17 +1,23 @@
-# SMS Backend — Phase 1 & 2
+# SMS Backend — Phase 1, 2 & 3
 
 ## What's in Phase 1 (Auth)
 - Owner registration (creates a User with role OWNER + their Shop together)
-- Single login endpoint for everyone — owner, manager, staff. Role comes back from the DB, the frontend never has to guess which one to call.
-- JWT access + refresh tokens
-- A protected `/api/me` route to prove auth works
+- Single login endpoint for everyone — owner, manager, staff
+- JWT access + refresh tokens, refresh returns fresh user/shop data too
+- A protected `/api/me` route
 
 ## What's in Phase 2 (Employees, Attendance, Payroll)
-- Employee records, separate from login accounts — most employees don't need to log in at all
-- A separate "grant login access" step for the few who do (e.g. managers)
-- Check-in/check-out for hourly employees, manual present/absent marking for daily/weekly/monthly employees
+- Employee records, separate from login accounts
+- A separate "grant login access" step for employees who need one
+- Check-in/check-out for hourly employees, manual marking for daily/weekly/monthly employees
 - Staff can only mark their own attendance; owners/managers can mark anyone's
-- Payroll preview (calculate without saving) and payroll runs (saved + mark as paid)
+- Payroll preview and saved payroll runs
+
+## What's in Phase 3 (Orders & Work Assignments)
+- Orders: client name/phone, instructions, delivery date, amount, advance payment. Balance is calculated automatically (amount minus advance) and included in every response.
+- Order status moves through PENDING → IN_PROGRESS → READY → DELIVERED, or CANCELLED
+- Work assignments link an order to an employee with a task and due date
+- Owners/managers assign work and can edit anything; staff can see their own tasks and update only the status of their own assignments
 
 ## Setup steps
 
@@ -23,13 +29,7 @@ npm -v
 ```
 
 ### 2. Get a PostgreSQL database
-Easiest options for beginners (no local install needed):
-- **Neon** (https://neon.tech) — free tier, gives you a `DATABASE_URL` instantly
-- **Supabase** (https://supabase.com) — also free tier
-- Or install Postgres locally if you prefer
-
-Copy the connection string they give you — it looks like:
-`postgresql://user:password@host:5432/dbname`
+- **Neon** (https://neon.tech) or **Supabase** (https://supabase.com) both have free tiers and give you a `DATABASE_URL` instantly
 
 ### 3. Install dependencies
 ```
@@ -41,120 +41,77 @@ npm install
 ```
 cp .env.example .env
 ```
-Open `.env` and paste in your real `DATABASE_URL`. Generate secrets by running:
+Fill in your `DATABASE_URL`, and generate JWT secrets:
 ```
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
-Run that twice — once for `JWT_ACCESS_SECRET`, once for `JWT_REFRESH_SECRET`.
+Run that twice, once for `JWT_ACCESS_SECRET` and once for `JWT_REFRESH_SECRET`.
 
 ### 5. Create the database tables
 ```
-npx prisma migrate dev --name init
+npx prisma migrate dev --name phase3_orders_assignments
 ```
-This reads `prisma/schema.prisma` and creates the actual tables in your Postgres database.
-
-If you're pulling in the Phase 2 update (Employee/Attendance/PayrollRun tables) on top of an
-existing Phase 1 database, just run migrate again with a new name — it'll add the new tables
-without touching your existing data:
-```
-npx prisma migrate dev --name phase2_employees_attendance_payroll
-```
+This adds the `Order` and `WorkAssignment` tables on top of your existing Phase 1/2 data — nothing gets wiped.
 
 ### 6. Run the server
 ```
 npm run dev
 ```
-You should see: `BMS backend running on http://localhost:5000`
+Visit `http://localhost:5000/docs` for the interactive Swagger UI covering every endpoint.
 
-## Test it (use Postman, Insomnia, or curl)
+## Test Phase 3 (use the accessToken from login)
 
-**Register an owner:**
+**Create an order:**
 ```
-POST http://localhost:5000/api/auth/register
-Content-Type: application/json
-
-{
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "phone": "9998887777",
-  "password": "SecurePass123",
-  "shopName": "Jane's Boutique",
-  "shopAddress": "123 Main St"
-}
-```
-This returns an `accessToken`. Copy it.
-
-**Login (works for owners AND staff — same endpoint, role comes back from the DB):**
-```
-POST http://localhost:5000/api/auth/login
-Content-Type: application/json
-
-{
-  "email": "jane@example.com",
-  "password": "SecurePass123"
-}
-```
-
-**Call the protected route:**
-```
-GET http://localhost:5000/api/me
-Authorization: Bearer <paste accessToken here>
-```
-You should get back your decoded auth info. Without the header, you get a 401.
-
-## Test Phase 2 (use the accessToken from login above)
-
-**Create an employee:**
-```
-POST http://localhost:5000/api/employees
+POST http://localhost:5000/api/orders
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
 {
-  "name": "Ravi Kumar",
-  "phone": "9876543210",
-  "payType": "HOURLY",
-  "payRate": 150
+  "clientName": "Anjali Rao",
+  "clientPhone": "9123456780",
+  "instructions": "Blue silk saree, blouse stitching, size 38",
+  "deliveryDate": "2026-08-25T00:00:00.000Z",
+  "amount": 3500,
+  "advancePayment": 1000
 }
 ```
-Copy the returned `id` — you'll need it as `employeeId` below.
+Copy the returned `id` — that's your `orderId`.
 
-**Check in / check out (as owner, on behalf of that employee):**
+**Assign an employee to it:**
 ```
-POST http://localhost:5000/api/attendance/checkin
-Authorization: Bearer <accessToken>
-Content-Type: application/json
-
-{ "employeeId": "<paste employee id>" }
-```
-Wait a bit, then call `/api/attendance/checkout` the same way — `hoursWorked` gets calculated automatically.
-
-**Preview payroll for that employee:**
-```
-POST http://localhost:5000/api/payroll/preview
+POST http://localhost:5000/api/orders/<orderId>/assignments
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
 {
-  "employeeId": "<paste employee id>",
-  "periodStart": "2026-08-01T00:00:00.000Z",
-  "periodEnd": "2026-08-31T00:00:00.000Z"
+  "employeeId": "<paste employee id from Phase 2>",
+  "task": "Stitch blouse",
+  "dueDate": "2026-08-23T00:00:00.000Z"
 }
 ```
-This calculates pay from the attendance you just logged, without saving anything.
 
-**Grant an employee login access (optional, e.g. for a manager):**
+**See the order with its assignments:**
 ```
-POST http://localhost:5000/api/employees/<employee id>/grant-access
+GET http://localhost:5000/api/orders/<orderId>
 Authorization: Bearer <accessToken>
+```
+
+**As the assigned employee, update task status:**
+```
+PATCH http://localhost:5000/api/assignments/<assignment id>
+Authorization: Bearer <employee's accessToken>
 Content-Type: application/json
 
-{ "email": "ravi@example.com", "role": "STAFF" }
+{ "status": "IN_PROGRESS" }
 ```
-Returns a `temporaryPassword` — this is shown once, make sure to save it.
+If that employee tries to send `task` or `notes` instead of just `status`, they'll get a 403 — only owners/managers can edit assignment details.
 
-Full endpoint reference is in `openapi.json` — paste it into https://editor.swagger.io to browse it visually.
+Full endpoint reference: `openapi.json`, or browse it live at `/docs` once the server's running.
 
 ## Useful commands
-- `npx prisma studio` — opens a visual browser for your database (great for beginners to see data)
+- `npx prisma studio` — visual database browser
 - `npm run dev` — restarts automatically on file changes
+
+## Next: Phase 4
+React frontend — login/register pages, dashboard, employee & attendance management, order board, and the protected route wrapper we designed earlier.
