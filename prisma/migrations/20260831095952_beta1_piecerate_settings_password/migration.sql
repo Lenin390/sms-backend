@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "PayType" ADD VALUE 'PIECE_RATE';

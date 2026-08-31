@@ -1,6 +1,7 @@
 const { z } = require("zod");
 const prisma = require("../config/db");
 const { validateRequest } = require("../utils/validation");
+const { logActivity } = require("../utils/activityLog");
 
 const orderSchema = z.object({
   clientName: z.string().min(2, "Client name must be at least 2 characters"),
@@ -16,7 +17,7 @@ const updateSchema = orderSchema.partial().extend({
 });
 
 function withBalance(order) {
-  return { success: true, data: { ...order, balance: order.amount - order.advancePayment } };
+  return { ...order, balance: order.amount - order.advancePayment };
 }
 
 async function createOrder(req, res) {
@@ -26,6 +27,8 @@ async function createOrder(req, res) {
   const order = await prisma.order.create({
     data: { ...data, shopId: req.auth.shopId },
   });
+
+  logActivity(req.auth.shopId, "ORDER_CREATED", `Order for ${order.clientName} created`);
 
   res.status(201).json(withBalance(order));
 }
@@ -85,6 +88,10 @@ async function updateOrder(req, res) {
     where: { id: existing.id },
     data,
   });
+
+  if (data.status === "DELIVERED" && existing.status !== "DELIVERED") {
+    logActivity(req.auth.shopId, "ORDER_DELIVERED", `Order for ${updated.clientName} delivered`);
+  }
 
   res.json(withBalance(updated));
 }

@@ -1,6 +1,7 @@
 const { z } = require("zod");
 const prisma = require("../config/db");
 const { calculatePay } = require("../utils/payroll");
+const { logActivity } = require("../utils/activityLog");
 
 const periodSchema = z.object({
   employeeId: z.string(),
@@ -91,6 +92,7 @@ async function listPayrollRuns(req, res) {
 async function markPayrollPaid(req, res) {
   const run = await prisma.payrollRun.findFirst({
     where: { id: req.params.id, employee: { shopId: req.auth.shopId } },
+    include: { employee: { select: { name: true } } },
   });
   if (!run) {
     return res.status(404).json({ success: false, message: "Payroll run not found" });
@@ -100,6 +102,12 @@ async function markPayrollPaid(req, res) {
     where: { id: run.id },
     data: { status: "PAID", paidOn: new Date() },
   });
+
+  logActivity(
+    req.auth.shopId,
+    "PAYROLL_PAID",
+    `Payment of ₹${run.netPay} released to ${run.employee.name}`
+  );
 
   res.json(updated);
 }

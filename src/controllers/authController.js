@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const { z } = require("zod");
 const prisma = require("../config/db");
 const {
@@ -8,8 +9,10 @@ const {
 } = require("../utils/token");
 const { withRetry, cleanupRegistrationArtifacts } = require("../utils/dbRetry");
 const { validateRequest } = require("../utils/validation");
+const { sendResetEmail } = require("../utils/email");
 
 const SALT_ROUNDS = 12;
+const RESET_TOKEN_EXPIRY_MINUTES = 30;
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -23,6 +26,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 // Register an owner and their shop together
@@ -82,11 +86,13 @@ async function register(req, res) {
   });
 }
 
-// Login handles all roles the same way
+// Login handles all roles the same way. rememberMe controls how long the
+// refresh token stays valid - unchecked, it expires quickly (short session);
+// checked, it lasts much longer so the person doesn't have to log in every day.
 async function login(req, res) {
   const data = validateRequest(req, res, loginSchema);
   if (!data) return;
-  const { email, password } = data;
+  const { email, password, rememberMe } = data;
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -105,7 +111,10 @@ async function login(req, res) {
 
   const tokenPayload = { id: user.id, shopId: user.shopId, role: user.role };
   const accessToken = signAccessToken(tokenPayload);
-  const refreshToken = signRefreshToken(tokenPayload);
+  const refreshExpiry = rememberMe
+    ? process.env.JWT_REFRESH_EXPIRY_REMEMBER || "30d"
+    : process.env.JWT_REFRESH_EXPIRY_SESSION || "1d";
+  const refreshToken = signRefreshToken(tokenPayload, refreshExpiry);
 
   res.json({
     success: true,
@@ -153,4 +162,108 @@ async function refresh(req, res) {
   }
 }
 
-module.exports = { register, login, refresh };
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+function hashToken(rawToken) {
+  return crypto.createHash("sha256").update(rawToken).digest("hex");
+}
+
+async function forgotPassword(req, res) {
+  const data = validateRequest(req, res, forgotPasswordSchema);
+  if (!data) return;
+
+  const genericResponse = {
+    success: true,
+    message: "If an account exists for that email, a reset link has been sent.",
+  };
+
+  const user = await prisma.user.findUnique({ where: { email: data.email } });
+  if (!user || !user.isActive) {
+    return res.json(genericResponse);
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+  await prisma.passwordResetToken.create({
+    data: { userId: user.id, tokenHash, expiresAt },
+  });
+
+  const resetLink = `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password?token=${rawToken}`;
+
+  try {
+    await sendResetEmail(user.email, resetLink);
+  } catch (err) {
+    console.error("Failed to send reset email:", err.message);
+  }
+
+  res.json(genericResponse);
+}
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+async function resetPassword(req, res) {
+  const data = validateRequest(req, res, resetPasswordSchema);
+  if (!data) return;
+
+  const tokenHash = hashToken(data.token);
+
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+    return res.status(400).json({ success: false, message: "This reset link is invalid or has expired" });
+  }
+
+  const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    }),
+  ]);
+
+  res.json({ success: true, message: "Password reset successfully. You can now log in." });
+}
+
+// Authenticated change-password - different from the forgot/reset flow above,
+// this is for a logged-in user who knows their current password and wants
+// to change it from Settings.
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
+async function changePassword(req, res) {
+  const data = validateRequest(req, res, changePasswordSchema);
+  if (!data) return;
+
+  const user = await prisma.user.findUnique({ where: { id: req.auth.id } });
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  const isMatch = await bcrypt.compare(data.currentPassword, user.passwordHash);
+  if (!isMatch) {
+    return res.status(401).json({ success: false, message: "Current password is incorrect" });
+  }
+
+  const passwordHash = await bcrypt.hash(data.newPassword, SALT_ROUNDS);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+
+  res.json({ success: true, message: "Password changed successfully" });
+}
+
+module.exports = { register, login, refresh, forgotPassword, resetPassword, changePassword };

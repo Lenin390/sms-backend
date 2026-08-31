@@ -5,6 +5,7 @@ const {
   createEmployee,
   listEmployees,
   getEmployee,
+  getEmployeeSummary,
   updateEmployee,
   deactivateEmployee,
   grantLoginAccess,
@@ -17,6 +18,7 @@ router.use(requireAuth, requireRole("OWNER", "MANAGER"));
 router.post("/", asyncHandler(createEmployee));
 router.get("/", asyncHandler(listEmployees));
 router.get("/:id", asyncHandler(getEmployee));
+router.get("/:id/summary", asyncHandler(getEmployeeSummary));
 router.patch("/:id", asyncHandler(updateEmployee));
 router.delete("/:id", asyncHandler(deactivateEmployee));
 router.post("/:id/grant-access", asyncHandler(grantLoginAccess));

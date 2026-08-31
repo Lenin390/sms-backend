@@ -75,6 +75,7 @@ enum PayType {
   DAILY
   WEEKLY
   MONTHLY
+  PIECE_RATE
 }
 
 model Attendance {
@@ -126,18 +127,18 @@ enum PayrollStatus {
 }
 
 model Order {
-  id              String      @id @default(uuid())
-  shopId          String
-  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  clientName      String
-  clientPhone     String
-  instructions    String?
-  deliveryDate    DateTime
-  amount          Float
-  advancePayment  Float       @default(0)
-  status          OrderStatus @default(PENDING)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  shopId         String
+  shop           Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  clientName     String
+  clientPhone    String
+  instructions   String?
+  deliveryDate   DateTime
+  amount         Float
+  advancePayment Float       @default(0)
+  status         OrderStatus @default(PENDING)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   assignments WorkAssignment[]
 
@@ -172,4 +173,28 @@ enum AssignmentStatus {
   PENDING
   IN_PROGRESS
   DONE
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  shopId    String
+  type      String
+  message   String
+  actorName String?
+  createdAt DateTime @default(now())
+
+  @@index([shopId, createdAt])
+  @@map("activity_logs")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

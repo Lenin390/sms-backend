@@ -6,9 +6,9 @@ function signAccessToken(payload) {
   });
 }
 
-function signRefreshToken(payload) {
+function signRefreshToken(payload, expiresInOverride) {
   return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRY || "7d",
+    expiresIn: expiresInOverride || process.env.JWT_REFRESH_EXPIRY || "7d",
   });
 }
 

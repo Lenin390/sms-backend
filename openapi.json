@@ -2,33 +2,20 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SMS Backend API",
-    "version": "1.2.0",
-    "description": "API for Store Management System - auth, employees, attendance, payroll, orders, and work assignments"
+    "version": "1.3.0",
+    "description": "API for Store Management System - auth, employees, attendance, payroll, orders, work assignments, and dashboard"
   },
-  "servers": [
-    { "url": "http://localhost:5000", "description": "Local server" }
-  ],
+  "servers": [{ "url": "http://localhost:5000", "description": "Local server" }],
   "paths": {
     "/api/auth/register": {
       "post": {
         "summary": "Register owner (creates User + Shop)",
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
-            }
-          }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } }
         },
         "responses": {
-          "201": {
-            "description": "Registered successfully",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/RegisterResponse" }
-              }
-            }
-          },
+          "201": { "description": "Registered successfully", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterResponse" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" }
         }
       }
@@ -38,21 +25,10 @@
         "summary": "Login (owners and staff)",
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/LoginRequest" }
-            }
-          }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
         },
         "responses": {
-          "200": {
-            "description": "Logged in",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/LoginResponse" }
-              }
-            }
-          },
+          "200": { "description": "Logged in", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -63,19 +39,41 @@
         "summary": "Refresh access token using a refresh token",
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/RefreshRequest" }
-            }
-          }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } }
         },
         "responses": {
-          "200": {
-            "description": "Token refreshed successfully",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshResponse" } } }
-          },
+          "200": { "description": "New tokens + fresh user/shop data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "summary": "Request a password reset email",
+        "description": "Always returns 200 with a generic message, regardless of whether the email exists, to avoid leaking registered emails.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ForgotPasswordRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Generic confirmation message", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericMessageResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "description": "Too many reset attempts" }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "summary": "Reset password using the token from the reset email",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResetPasswordRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Password reset", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericMessageResponse" } } } },
+          "400": { "description": "Invalid, expired, or already-used token" },
+          "429": { "description": "Too many reset attempts" }
         }
       }
     },
@@ -93,10 +91,7 @@
       "post": {
         "summary": "Create an employee",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeRequest" } } }
-        },
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeRequest" } } } },
         "responses": {
           "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
@@ -106,15 +101,8 @@
       "get": {
         "summary": "List employees for the logged-in owner/manager's shop",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "active", "in": "query", "schema": { "type": "boolean" }, "description": "Filter by isActive" }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of employees",
-            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Employee" } } } }
-          }
-        }
+        "parameters": [{ "name": "active", "in": "query", "schema": { "type": "boolean" } }],
+        "responses": { "200": { "description": "List of employees", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Employee" } } } } } }
       }
     },
     "/api/employees/{id}": {
@@ -122,31 +110,20 @@
         "summary": "Get one employee",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
-        "responses": {
-          "200": { "description": "Employee", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "responses": { "200": { "description": "Employee", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
       },
       "patch": {
         "summary": "Update an employee",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
-        "requestBody": {
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeRequest" } } }
-        },
-        "responses": {
-          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeRequest" } } } },
+        "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Employee" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
       },
       "delete": {
         "summary": "Deactivate an employee (soft delete)",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
-        "responses": {
-          "200": { "description": "Deactivated" },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "responses": { "200": { "description": "Deactivated" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/api/employees/{id}/grant-access": {
@@ -154,54 +131,32 @@
         "summary": "Give an employee login access (creates a linked User)",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/EmployeeId" }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantAccessRequest" } } }
-        },
-        "responses": {
-          "201": { "description": "Access granted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantAccessResponse" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "409": { "description": "Already has access" }
-        }
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantAccessRequest" } } } },
+        "responses": { "201": { "description": "Access granted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantAccessResponse" } } } }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "description": "Already has access" } }
       }
     },
     "/api/attendance/checkin": {
       "post": {
         "summary": "Check in for today (hourly employees)",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeIdBody" } } }
-        },
-        "responses": {
-          "201": { "description": "Checked in", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } },
-          "409": { "description": "Already checked in today" }
-        }
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeIdBody" } } } },
+        "responses": { "201": { "description": "Checked in", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } }, "409": { "description": "Already checked in today" } }
       }
     },
     "/api/attendance/checkout": {
       "post": {
         "summary": "Check out for today (hourly employees)",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeIdBody" } } }
-        },
-        "responses": {
-          "200": { "description": "Checked out, hoursWorked calculated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } },
-          "400": { "description": "Haven't checked in yet" }
-        }
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmployeeIdBody" } } } },
+        "responses": { "200": { "description": "Checked out, hoursWorked calculated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } }, "400": { "description": "Haven't checked in yet" } }
       }
     },
     "/api/attendance/mark": {
       "post": {
         "summary": "Manually mark attendance (daily/weekly/monthly employees, or corrections)",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MarkAttendanceRequest" } } }
-        },
-        "responses": {
-          "200": { "description": "Marked", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } }
-        }
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MarkAttendanceRequest" } } } },
+        "responses": { "200": { "description": "Marked", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Attendance" } } } } }
       }
     },
     "/api/attendance": {
@@ -213,35 +168,23 @@
           { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
           { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
         ],
-        "responses": {
-          "200": { "description": "Attendance records", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Attendance" } } } } }
-        }
+        "responses": { "200": { "description": "Attendance records", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Attendance" } } } } } }
       }
     },
     "/api/payroll/preview": {
       "post": {
         "summary": "Calculate pay for a period without saving it",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPeriodRequest" } } }
-        },
-        "responses": {
-          "200": { "description": "Calculated breakdown", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPreview" } } } }
-        }
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPeriodRequest" } } } },
+        "responses": { "200": { "description": "Calculated breakdown", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPreview" } } } } }
       }
     },
     "/api/payroll/runs": {
       "post": {
         "summary": "Save a payroll run",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPeriodRequest" } } }
-        },
-        "responses": {
-          "201": { "description": "Run saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollRun" } } } }
-        }
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollPeriodRequest" } } } },
+        "responses": { "201": { "description": "Run saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollRun" } } } } }
       },
       "get": {
         "summary": "List payroll runs",
@@ -250,9 +193,7 @@
           { "name": "employeeId", "in": "query", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["DRAFT", "PAID"] } }
         ],
-        "responses": {
-          "200": { "description": "Payroll runs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PayrollRun" } } } } }
-        }
+        "responses": { "200": { "description": "Payroll runs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PayrollRun" } } } } } }
       }
     },
     "/api/payroll/runs/{id}/pay": {
@@ -260,24 +201,15 @@
         "summary": "Mark a payroll run as paid",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": {
-          "200": { "description": "Marked paid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollRun" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "responses": { "200": { "description": "Marked paid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayrollRun" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/api/orders": {
       "post": {
         "summary": "Create an order",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderRequest" } } }
-        },
-        "responses": {
-          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" }
-        }
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderRequest" } } } },
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
       },
       "get": {
         "summary": "List orders for the shop",
@@ -287,9 +219,7 @@
           { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
           { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
         ],
-        "responses": {
-          "200": { "description": "Orders", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } }
-        }
+        "responses": { "200": { "description": "Orders", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } } }
       }
     },
     "/api/orders/{id}": {
@@ -297,22 +227,14 @@
         "summary": "Get one order with its assignments",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
-        "responses": {
-          "200": { "description": "Order", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderWithAssignments" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "responses": { "200": { "description": "Order", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderWithAssignments" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
       },
       "patch": {
         "summary": "Update an order (details or status)",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
-        "requestBody": {
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderUpdateRequest" } } }
-        },
-        "responses": {
-          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderUpdateRequest" } } } },
+        "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/api/orders/{orderId}/assignments": {
@@ -320,22 +242,14 @@
         "summary": "Assign an employee to work on this order",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/OrderIdParam" }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentRequest" } } }
-        },
-        "responses": {
-          "201": { "description": "Assigned", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentRequest" } } } },
+        "responses": { "201": { "description": "Assigned", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
       },
       "get": {
         "summary": "List assignments for this order",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/OrderIdParam" }],
-        "responses": {
-          "200": { "description": "Assignments", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } } }
-        }
+        "responses": { "200": { "description": "Assignments", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } } } }
       }
     },
     "/api/assignments": {
@@ -347,9 +261,7 @@
           { "name": "orderId", "in": "query", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "DONE"] } }
         ],
-        "responses": {
-          "200": { "description": "Assignments", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } } }
-        }
+        "responses": { "200": { "description": "Assignments", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Assignment" } } } } } }
       }
     },
     "/api/assignments/{id}": {
@@ -357,13 +269,17 @@
         "summary": "Update an assignment (staff can only update their own status)",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": {
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentUpdateRequest" } } }
-        },
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssignmentUpdateRequest" } } } },
+        "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "summary": "Aggregated dashboard data - stats, orders overview, order status breakdown, today's orders/attendance, recent activity",
+        "security": [{ "bearerAuth": [] }],
         "responses": {
-          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Assignment" } } } },
-          "403": { "$ref": "#/components/responses/Forbidden" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "200": { "description": "Dashboard summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardSummaryResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
     }
@@ -393,11 +309,12 @@
       "RegisterResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string", "example": "Registered successfully" },
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
           "user": { "$ref": "#/components/schemas/UserSummary" },
           "shop": { "$ref": "#/components/schemas/ShopSummary" },
-          "accessToken": { "type": "string", "example": "jwt.access.token" },
-          "refreshToken": { "type": "string", "example": "jwt.refresh.token" }
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" }
         }
       },
       "LoginRequest": {
@@ -408,49 +325,35 @@
       "LoginResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string", "example": "Logged in successfully" },
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
           "user": { "$ref": "#/components/schemas/UserSummary" },
           "shop": { "$ref": "#/components/schemas/ShopSummary" },
-          "accessToken": { "type": "string", "example": "jwt.access.token" },
-          "refreshToken": { "type": "string", "example": "jwt.refresh.token" }
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" }
         }
       },
       "RefreshRequest": { "type": "object", "required": ["refreshToken"], "properties": { "refreshToken": { "type": "string" } } },
-      "RefreshResponse": {
+      "ForgotPasswordRequest": {
         "type": "object",
+        "required": ["email"],
+        "properties": { "email": { "type": "string", "format": "email" } }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": ["token", "password"],
         "properties": {
-          "message": { "type": "string", "example": "Token refreshed successfully" },
-          "user": { "$ref": "#/components/schemas/UserSummary" },
-          "shop": { "$ref": "#/components/schemas/ShopSummary" },
-          "accessToken": { "type": "string", "example": "jwt.access.token" },
-          "refreshToken": { "type": "string", "example": "jwt.refresh.token" }
+          "token": { "type": "string", "description": "Raw token from the reset link (not the hashed version stored in the DB)" },
+          "password": { "type": "string", "format": "password" }
         }
       },
-      "UserSummary": {
+      "GenericMessageResponse": {
         "type": "object",
-        "properties": {
-          "id": { "type": "string", "example": "usr_123" },
-          "name": { "type": "string", "example": "John Doe" },
-          "email": { "type": "string", "format": "email", "example": "john@example.com" },
-          "phone": { "type": "string", "nullable": true, "example": "+1234567890" },
-          "role": { "type": "string", "example": "OWNER" }
-        }
+        "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } }
       },
-      "ShopSummary": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "example": "shop_123" },
-          "name": { "type": "string", "example": "My Shop" }
-        }
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "example": false },
-          "message": { "type": "string", "example": "Invalid email or password" }
-        }
-      },
-      "MeResponse": { "type": "object", "properties": { "message": { "type": "string" }, "auth": { "type": "object" } } },
+      "UserSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "email": { "type": "string" }, "role": { "type": "string" } } },
+      "ShopSummary": { "type": "object", "nullable": true, "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
+      "MeResponse": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" }, "auth": { "type": "object" } } },
 
       "EmployeeRequest": {
         "type": "object",
@@ -481,27 +384,14 @@
       "GrantAccessRequest": {
         "type": "object",
         "required": ["email"],
-        "properties": {
-          "email": { "type": "string", "format": "email" },
-          "role": { "type": "string", "enum": ["MANAGER", "STAFF"] },
-          "password": { "type": "string", "description": "Optional - auto-generated if omitted" }
-        }
+        "properties": { "email": { "type": "string", "format": "email" }, "role": { "type": "string", "enum": ["MANAGER", "STAFF"] }, "password": { "type": "string" } }
       },
       "GrantAccessResponse": {
         "type": "object",
-        "properties": {
-          "message": { "type": "string" },
-          "user": { "$ref": "#/components/schemas/UserSummary" },
-          "temporaryPassword": { "type": "string", "description": "Only returned when password wasn't supplied - shown once" }
-        }
+        "properties": { "success": { "type": "boolean" }, "message": { "type": "string" }, "user": { "$ref": "#/components/schemas/UserSummary" }, "temporaryPassword": { "type": "string" } }
       },
 
-      "EmployeeIdBody": {
-        "type": "object",
-        "properties": {
-          "employeeId": { "type": "string", "description": "Required for owner/manager, ignored for staff (uses their own)" }
-        }
-      },
+      "EmployeeIdBody": { "type": "object", "properties": { "employeeId": { "type": "string" } } },
       "MarkAttendanceRequest": {
         "type": "object",
         "required": ["status"],
@@ -529,11 +419,7 @@
       "PayrollPeriodRequest": {
         "type": "object",
         "required": ["employeeId", "periodStart", "periodEnd"],
-        "properties": {
-          "employeeId": { "type": "string" },
-          "periodStart": { "type": "string", "format": "date-time" },
-          "periodEnd": { "type": "string", "format": "date-time" }
-        }
+        "properties": { "employeeId": { "type": "string" }, "periodStart": { "type": "string", "format": "date-time" }, "periodEnd": { "type": "string", "format": "date-time" } }
       },
       "PayrollPreview": {
         "type": "object",
@@ -603,12 +489,7 @@
       "AssignmentRequest": {
         "type": "object",
         "required": ["employeeId", "task"],
-        "properties": {
-          "employeeId": { "type": "string" },
-          "task": { "type": "string" },
-          "dueDate": { "type": "string", "format": "date-time" },
-          "notes": { "type": "string" }
-        }
+        "properties": { "employeeId": { "type": "string" }, "task": { "type": "string" }, "dueDate": { "type": "string", "format": "date-time" }, "notes": { "type": "string" } }
       },
       "AssignmentUpdateRequest": {
         "type": "object",
@@ -630,14 +511,71 @@
           "dueDate": { "type": "string", "format": "date-time", "nullable": true },
           "notes": { "type": "string", "nullable": true }
         }
+      },
+
+      "DashboardSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "totalEmployees": { "type": "integer" },
+                  "activeOrders": { "type": "integer" },
+                  "ordersDueToday": { "type": "integer" },
+                  "todaysRevenue": { "type": "number" },
+                  "pendingPayments": { "type": "number" }
+                }
+              },
+              "ordersOverview": {
+                "type": "array",
+                "items": { "type": "object", "properties": { "date": { "type": "string", "format": "date" }, "count": { "type": "integer" } } }
+              },
+              "orderStatusBreakdown": {
+                "type": "object",
+                "additionalProperties": { "type": "integer" },
+                "description": "Keyed by OrderStatus, e.g. { PENDING: 6, IN_PROGRESS: 7 }"
+              },
+              "todaysOrders": { "type": "array", "items": { "type": "object" } },
+              "todaysAttendance": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": { "type": "string" },
+                    "employeeName": { "type": "string" },
+                    "status": { "type": "string" },
+                    "checkIn": { "type": "string", "format": "date-time", "nullable": true },
+                    "checkOut": { "type": "string", "format": "date-time", "nullable": true }
+                  }
+                }
+              },
+              "recentActivity": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "type": { "type": "string" },
+                    "message": { "type": "string" },
+                    "actorName": { "type": "string", "nullable": true },
+                    "createdAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
-      "BadRequest": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-      "Unauthorized": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-      "Forbidden": { "description": "Forbidden - insufficient role", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-      "NotFound": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-      "Conflict": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+      "BadRequest": { "description": "Bad request", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } } } } } },
+      "Unauthorized": { "description": "Unauthorized", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } } } } } },
+      "Forbidden": { "description": "Forbidden - insufficient role", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } } } } } },
+      "NotFound": { "description": "Not found", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } } } } } }
     }
   }
 }

@@ -1,12 +1,13 @@
 const { z } = require("zod");
 const prisma = require("../config/db");
 const { validateRequest } = require("../utils/validation");
+const { logActivity } = require("../utils/activityLog");
 
 const employeeSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().optional(),
   designation: z.string().optional(),
-  payType: z.enum(["HOURLY", "DAILY", "WEEKLY", "MONTHLY"]),
+  payType: z.enum(["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "PIECE_RATE"]),
   payRate: z.number().positive("Pay rate must be greater than 0"),
   joiningDate: z.string().datetime().optional(),
 });
@@ -18,6 +19,8 @@ async function createEmployee(req, res) {
   const employee = await prisma.employee.create({
     data: { ...data, shopId: req.auth.shopId },
   });
+
+  logActivity(req.auth.shopId, "EMPLOYEE_ADDED", `New employee ${employee.name} added`);
 
   res.status(201).json(employee);
 }
@@ -46,6 +49,53 @@ async function getEmployee(req, res) {
   }
 
   res.json(employee);
+}
+
+async function getEmployeeSummary(req, res) {
+  const employee = await prisma.employee.findFirst({
+    where: { id: req.params.id, shopId: req.auth.shopId },
+  });
+  if (!employee) {
+    return res.status(404).json({ success: false, message: "Employee not found" });
+  }
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+  const [attendanceLast30Days, recentPayrollRuns, currentAssignments] = await Promise.all([
+    prisma.attendance.findMany({
+      where: { employeeId: employee.id, date: { gte: thirtyDaysAgo } },
+      orderBy: { date: "desc" },
+    }),
+    prisma.payrollRun.findMany({
+      where: { employeeId: employee.id },
+      orderBy: { periodStart: "desc" },
+      take: 5,
+    }),
+    prisma.workAssignment.count({
+      where: { employeeId: employee.id, status: { in: ["PENDING", "IN_PROGRESS"] } },
+    }),
+  ]);
+
+  const attendanceSummary = {
+    present: attendanceLast30Days.filter((a) => a.status === "PRESENT").length,
+    absent: attendanceLast30Days.filter((a) => a.status === "ABSENT").length,
+    halfDay: attendanceLast30Days.filter((a) => a.status === "HALF_DAY").length,
+    onLeave: attendanceLast30Days.filter((a) => a.status === "ON_LEAVE").length,
+    totalHours: attendanceLast30Days.reduce((sum, a) => sum + (a.hoursWorked || 0), 0),
+  };
+
+  res.json({
+    success: true,
+    data: {
+      employee,
+      attendanceSummary,
+      recentAttendance: attendanceLast30Days.slice(0, 10),
+      recentPayrollRuns,
+      activeAssignmentsCount: currentAssignments,
+    },
+  });
 }
 
 async function updateEmployee(req, res) {
@@ -87,6 +137,7 @@ async function deactivateEmployee(req, res) {
 
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const { sendAccessGrantedEmail } = require("../utils/email");
 
 const grantAccessSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -94,7 +145,6 @@ const grantAccessSchema = z.object({
   password: z.string().min(8).optional(), // if not given, we generate one
 });
 
-// Separate from createEmployee on purpose - most employees never need this.
 async function grantLoginAccess(req, res) {
   const data = validateRequest(req, res, grantAccessSchema);
   if (!data) return;
@@ -129,11 +179,16 @@ async function grantLoginAccess(req, res) {
     data: { linkedUserId: user.id },
   });
 
+  const loginUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`;
+  sendAccessGrantedEmail(email, data.password ? undefined : tempPassword, loginUrl).catch((err) =>
+    console.error("Failed to send access-granted email:", err.message)
+  );
+
   res.status(201).json({
     success: true,
     message: "Login access granted",
     user: { id: user.id, email: user.email, role: user.role },
-    temporaryPassword: data.password ? undefined : tempPassword, // only return if we generated it
+    temporaryPassword: data.password ? undefined : tempPassword,
   });
 }
 
@@ -141,6 +196,7 @@ module.exports = {
   createEmployee,
   listEmployees,
   getEmployee,
+  getEmployeeSummary,
   updateEmployee,
   deactivateEmployee,
   grantLoginAccess,

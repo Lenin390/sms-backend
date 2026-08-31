@@ -19,6 +19,23 @@
 - Work assignments link an order to an employee with a task and due date
 - Owners/managers assign work and can edit anything; staff can see their own tasks and update only the status of their own assignments
 
+**Phase 3.4 — Dashboard aggregation**
+- `GET /api/dashboard/summary` — one call returns everything the frontend dashboard needs: stat
+  counts, a 7-day orders trend, order status breakdown, today's orders, today's attendance, and a
+  recent activity feed.
+- New `ActivityLog` table, written to (safely, never blocking the request) when an employee is
+  added, an order is created, an order is delivered, or a payroll run is marked paid.
+
+**Phase 3.5 — Password reset**
+- `POST /api/auth/forgot-password` — always returns the same generic message whether or not the
+  email exists, so it can't be used to enumerate registered accounts. Generates a one-time token,
+  stores only its hash (never the raw token) in a new `PasswordResetToken` table, expires in 30
+  minutes.
+- `POST /api/auth/reset-password` — takes the raw token from the email link + a new password.
+- **Email sending is a dev stub right now** (`src/utils/email.js` just logs the reset link to your
+  console). Before this goes live, swap that function's body for a real provider (Resend, SendGrid,
+  etc.) — everywhere else in the app calls `sendResetEmail(...)` the same way regardless.
+
 ## Setup steps
 
 ### 1. Install Node.js
@@ -49,7 +66,7 @@ Run that twice, once for `JWT_ACCESS_SECRET` and once for `JWT_REFRESH_SECRET`.
 
 ### 5. Create the database tables
 ```
-npx prisma migrate dev --name phase3_orders_assignments
+npx prisma migrate dev --name phase3_4_dashboard_phase3_5_password_reset
 ```
 This adds the `Order` and `WorkAssignment` tables on top of your existing Phase 1/2 data — nothing gets wiped.
 
