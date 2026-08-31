@@ -44,7 +44,7 @@ async function createAssignment(req, res) {
     },
   });
 
-  res.status(201).json({ success: true, data: assignment });
+  res.status(201).json(assignment);
 }
 
 async function listOrderAssignments(req, res) {
@@ -61,7 +61,7 @@ async function listOrderAssignments(req, res) {
     orderBy: { createdAt: "asc" },
   });
 
-  res.json({ success: true, data: assignments });
+  res.json(assignments);
 }
 
 async function listAssignments(req, res) {
@@ -95,7 +95,7 @@ async function listAssignments(req, res) {
     orderBy: { createdAt: "desc" },
   });
 
-  res.json({ success: true, data: assignments });
+  res.json(assignments);
 }
 
 async function updateAssignment(req, res) {

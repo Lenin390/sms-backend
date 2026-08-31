@@ -351,9 +351,22 @@
         "type": "object",
         "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } }
       },
-      "UserSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "email": { "type": "string" }, "role": { "type": "string" } } },
+      "UserSummary": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "email": { "type": "string" }, "phone": { "type": "string" }, "role": { "type": "string" } } },
       "ShopSummary": { "type": "object", "nullable": true, "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
-      "MeResponse": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" }, "auth": { "type": "object" } } },
+      "MeResponse": { 
+        "type": "object", 
+        "properties": { 
+          "success": { "type": "boolean" }, 
+          "message": { "type": "string" }, 
+          "auth": { 
+            "type": "object", 
+            "properties": {
+              "user": { "$ref": "#/components/schemas/UserSummary" },
+              "shop": { "$ref": "#/components/schemas/ShopSummary" }
+            }
+          } 
+        } 
+      },
 
       "EmployeeRequest": {
         "type": "object",

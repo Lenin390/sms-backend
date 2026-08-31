@@ -2,6 +2,7 @@ const { z } = require("zod");
 const prisma = require("../config/db");
 const { calculatePay } = require("../utils/payroll");
 const { logActivity } = require("../utils/activityLog");
+const { validateRequest } = require("../utils/validation");
 
 const periodSchema = z.object({
   employeeId: z.string(),
