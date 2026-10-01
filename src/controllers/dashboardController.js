@@ -2,14 +2,12 @@ const prisma = require("../config/db");
 
 function startOfDay(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
 function endOfDay(date) {
   const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 }
 
 async function getSummary(req, res) {

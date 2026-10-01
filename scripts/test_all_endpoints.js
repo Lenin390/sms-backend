@@ -3,14 +3,15 @@ const API_URL = 'http://localhost:5000/api';
 
 // Generate unique timestamp for this test run
 const timestamp = Date.now();
+const cookieJar = new Map();
+const testOrigin = process.env.TEST_ORIGIN || 'http://localhost:5173';
 
 // Test state
 let testState = {
-  accessToken: null,
-  refreshToken: null,
   userId: null,
   shopId: null,
   employeeIds: [],
+  pieceRateEmployeeId: null,
   orderId: null,
   assignmentIds: [],
   payrollRunId: null,
@@ -21,14 +22,12 @@ let testState = {
 };
 
 // Utility function for API calls
-async function apiCall(method, endpoint, body = null, token = null) {
+async function apiCall(method, endpoint, body = null) {
   const headers = {
     'Content-Type': 'application/json',
+    'Origin': testOrigin,
   };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  if (cookieJar.size) headers.Cookie = [...cookieJar].map(([name, value]) => `${name}=${value}`).join('; ');
 
   const options = {
     method,
@@ -41,6 +40,13 @@ async function apiCall(method, endpoint, body = null, token = null) {
 
   try {
     const response = await fetch(`${API_URL}${endpoint}`, options);
+    const setCookies = response.headers.getSetCookie?.() || [response.headers.get('set-cookie') || ''];
+    for (const setCookie of setCookies) {
+      for (const match of setCookie.matchAll(/(?:^|,\s*)(sms_access|sms_refresh)=([^;,]*)/g)) {
+        if (match[2]) cookieJar.set(match[1], match[2]);
+        else cookieJar.delete(match[1]);
+      }
+    }
     const data = await response.json();
     return { status: response.status, data };
   } catch (error) {
@@ -80,8 +86,8 @@ async function runTests() {
       shopAddress: '123 Test Street',
     });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
-    testState.accessToken = response.data.accessToken;
-    testState.refreshToken = response.data.refreshToken;
+    if (!cookieJar.has('sms_access') || !cookieJar.has('sms_refresh')) throw new Error('Auth cookies were not set');
+    if ('accessToken' in response.data || 'refreshToken' in response.data) throw new Error('Tokens must not be returned in JSON');
     testState.userId = response.data.user.id;
     testState.shopId = response.data.shop.id;
     console.log(`  → Owner ID: ${testState.userId}, Shop ID: ${testState.shopId}`);
@@ -93,22 +99,19 @@ async function runTests() {
       password: 'TestPass123!',
     });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
-    testState.accessToken = response.data.accessToken;
-    testState.refreshToken = response.data.refreshToken;
+    if (!cookieJar.has('sms_access') || !cookieJar.has('sms_refresh')) throw new Error('Auth cookies were not set');
     console.log(`  → Login successful, tokens refreshed`);
   });
 
   await test('POST /auth/refresh', async () => {
-    const response = await apiCall('POST', '/auth/refresh', {
-      refreshToken: testState.refreshToken,
-    });
+    const response = await apiCall('POST', '/auth/refresh');
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
-    testState.accessToken = response.data.accessToken;
+    if ('accessToken' in response.data || 'refreshToken' in response.data) throw new Error('Tokens must not be returned in JSON');
     console.log(`  → Token refreshed successfully`);
   });
 
   await test('GET /me', async () => {
-    const response = await apiCall('GET', '/me', null, testState.accessToken);
+    const response = await apiCall('GET', '/me', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → User authenticated: ${response.data.auth.user.name}`);
   });
@@ -124,7 +127,7 @@ async function runTests() {
       payType: 'HOURLY',
       payRate: 200,
       joiningDate: new Date().toISOString(),
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     testState.employeeIds.push(response.data.id);
     console.log(`  → Employee created: ${response.data.id}`);
@@ -138,21 +141,33 @@ async function runTests() {
       payType: 'MONTHLY',
       payRate: 25000,
       joiningDate: new Date().toISOString(),
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     testState.employeeIds.push(response.data.id);
     console.log(`  → Employee created: ${response.data.id}`);
   });
 
+  await test('POST /employees (Create Piece-Rate Employee)', async () => {
+    const response = await apiCall('POST', '/employees', {
+      name: 'Piece Worker',
+      designation: 'Finisher',
+      payType: 'PIECE_RATE',
+      payRate: 15,
+      joiningDate: new Date().toISOString(),
+    });
+    if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
+    testState.pieceRateEmployeeId = response.data.id;
+  });
+
   await test('GET /employees (List Employees)', async () => {
-    const response = await apiCall('GET', '/employees', null, testState.accessToken);
+    const response = await apiCall('GET', '/employees', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} employees`);
   });
 
   await test('GET /employees/{id}', async () => {
     const employeeId = testState.employeeIds[0];
-    const response = await apiCall('GET', `/employees/${employeeId}`, null, testState.accessToken);
+    const response = await apiCall('GET', `/employees/${employeeId}`, null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Retrieved employee: ${response.data.name}`);
   });
@@ -162,7 +177,7 @@ async function runTests() {
     const response = await apiCall('PATCH', `/employees/${employeeId}`, {
       designation: 'Senior Tailor',
       payRate: 250,
-    }, testState.accessToken);
+    });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Employee updated: ${response.data.designation}`);
   });
@@ -173,7 +188,7 @@ async function runTests() {
       email: testState.employee2Email,
       role: 'MANAGER',
       password: 'JanePass123!',
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Access granted to employee`);
   });
@@ -184,7 +199,7 @@ async function runTests() {
   await test('POST /attendance/checkin', async () => {
     const response = await apiCall('POST', '/attendance/checkin', {
       employeeId: testState.employeeIds[0],
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Employee checked in`);
   });
@@ -192,7 +207,7 @@ async function runTests() {
   await test('POST /attendance/checkout', async () => {
     const response = await apiCall('POST', '/attendance/checkout', {
       employeeId: testState.employeeIds[0],
-    }, testState.accessToken);
+    });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Employee checked out, hours: ${response.data.hoursWorked}`);
   });
@@ -203,13 +218,24 @@ async function runTests() {
       date: new Date().toISOString(),
       status: 'PRESENT',
       notes: 'Marked present by owner',
-    }, testState.accessToken);
+    });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Attendance marked: ${response.data.status}`);
   });
 
+  await test('POST /attendance/mark (Record Completed Pieces)', async () => {
+    const response = await apiCall('POST', '/attendance/mark', {
+      employeeId: testState.pieceRateEmployeeId,
+      date: new Date().toISOString(),
+      status: 'PRESENT',
+      piecesCompleted: 12,
+    });
+    if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
+    if (response.data.piecesCompleted !== 12) throw new Error(`Expected 12 pieces, got ${response.data.piecesCompleted}`);
+  });
+
   await test('GET /attendance', async () => {
-    const response = await apiCall('GET', `/attendance?employeeId=${testState.employeeIds[0]}`, null, testState.accessToken);
+    const response = await apiCall('GET', `/attendance?employeeId=${testState.employeeIds[0]}`, null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} attendance records`);
   });
@@ -217,17 +243,42 @@ async function runTests() {
   // ============= PAYROLL TESTS =============
   console.log('\n\n=== PAYROLL ENDPOINTS ===');
 
-  const periodStart = new Date(new Date().setDate(1)).toISOString();
-  const periodEnd = new Date().toISOString();
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const periodEnd = now.toISOString();
 
   await test('POST /payroll/preview', async () => {
     const response = await apiCall('POST', '/payroll/preview', {
       employeeId: testState.employeeIds[0],
       periodStart,
       periodEnd,
-    }, testState.accessToken);
+    });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Payroll preview: Gross ${response.data.grossPay}, Net ${response.data.netPay}`);
+  });
+
+  await test('POST /payroll/preview (Piece-Rate Calculation)', async () => {
+    const response = await apiCall('POST', '/payroll/preview', {
+      employeeId: testState.pieceRateEmployeeId,
+      periodStart,
+      periodEnd,
+    });
+    if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
+    if (response.data.totalPieces !== 12 || response.data.grossPay !== 180) {
+      throw new Error(`Expected 12 pieces and gross pay 180, got ${JSON.stringify(response.data)}`);
+    }
+  });
+
+  await test('POST /payroll/runs (Save Piece-Rate Payroll)', async () => {
+    const response = await apiCall('POST', '/payroll/runs', {
+      employeeId: testState.pieceRateEmployeeId,
+      periodStart,
+      periodEnd,
+    });
+    if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
+    if (response.data.totalPieces !== 12 || response.data.grossPay !== 180) {
+      throw new Error(`Expected stored totals of 12 pieces and 180 pay, got ${JSON.stringify(response.data)}`);
+    }
   });
 
   await test('POST /payroll/runs (Create Payroll Run)', async () => {
@@ -235,20 +286,20 @@ async function runTests() {
       employeeId: testState.employeeIds[0],
       periodStart,
       periodEnd,
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     testState.payrollRunId = response.data.id;
     console.log(`  → Payroll run created: ${response.data.id}`);
   });
 
   await test('GET /payroll/runs', async () => {
-    const response = await apiCall('GET', '/payroll/runs', null, testState.accessToken);
+    const response = await apiCall('GET', '/payroll/runs', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} payroll runs`);
   });
 
   await test('PATCH /payroll/runs/{id}/pay (Mark as Paid)', async () => {
-    const response = await apiCall('PATCH', `/payroll/runs/${testState.payrollRunId}/pay`, {}, testState.accessToken);
+    const response = await apiCall('PATCH', `/payroll/runs/${testState.payrollRunId}/pay`, {});
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Payroll marked as paid, status: ${response.data.status}`);
   });
@@ -264,20 +315,20 @@ async function runTests() {
       deliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       amount: 3500,
       advancePayment: 1000,
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     testState.orderId = response.data.id;
     console.log(`  → Order created: ${response.data.id}, Balance: ${response.data.balance}`);
   });
 
   await test('GET /orders', async () => {
-    const response = await apiCall('GET', '/orders', null, testState.accessToken);
+    const response = await apiCall('GET', '/orders', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} orders`);
   });
 
   await test('GET /orders/{id}', async () => {
-    const response = await apiCall('GET', `/orders/${testState.orderId}`, null, testState.accessToken);
+    const response = await apiCall('GET', `/orders/${testState.orderId}`, null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Order status: ${response.data.status}, Balance: ${response.data.balance}`);
   });
@@ -285,7 +336,7 @@ async function runTests() {
   await test('PATCH /orders/{id} (Update Order Status)', async () => {
     const response = await apiCall('PATCH', `/orders/${testState.orderId}`, {
       status: 'IN_PROGRESS',
-    }, testState.accessToken);
+    });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Order status updated: ${response.data.status}`);
   });
@@ -299,20 +350,20 @@ async function runTests() {
       task: 'Stitch blouse',
       dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
       notes: 'Priority task',
-    }, testState.accessToken);
+    });
     if (response.status !== 201) throw new Error(`Expected 201, got ${response.status}: ${JSON.stringify(response.data)}`);
     testState.assignmentIds.push(response.data.id);
     console.log(`  → Assignment created: ${response.data.id}`);
   });
 
   await test('GET /orders/{orderId}/assignments', async () => {
-    const response = await apiCall('GET', `/orders/${testState.orderId}/assignments`, null, testState.accessToken);
+    const response = await apiCall('GET', `/orders/${testState.orderId}/assignments`, null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} assignments for order`);
   });
 
   await test('GET /assignments', async () => {
-    const response = await apiCall('GET', '/assignments', null, testState.accessToken);
+    const response = await apiCall('GET', '/assignments', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} total assignments`);
   });
@@ -320,7 +371,7 @@ async function runTests() {
   await test('PATCH /assignments/{id} (Update Assignment Status)', async () => {
     const response = await apiCall('PATCH', `/assignments/${testState.assignmentIds[0]}`, {
       status: 'IN_PROGRESS',
-    }, testState.accessToken);
+    });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Assignment status updated: ${response.data.status}`);
   });
@@ -329,7 +380,7 @@ async function runTests() {
   console.log('\n\n=== DASHBOARD ENDPOINTS ===');
 
   await test('GET /dashboard/summary', async () => {
-    const response = await apiCall('GET', '/dashboard/summary', null, testState.accessToken);
+    const response = await apiCall('GET', '/dashboard/summary', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Dashboard data retrieved`);
     console.log(`     Stats: ${response.data.data.stats.totalEmployees} employees, ${response.data.data.stats.activeOrders} active orders`);
@@ -339,13 +390,13 @@ async function runTests() {
   console.log('\n\n=== ADDITIONAL EMPLOYEE TESTS ===');
 
   await test('GET /employees?active=true', async () => {
-    const response = await apiCall('GET', '/employees?active=true', null, testState.accessToken);
+    const response = await apiCall('GET', '/employees?active=true', null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Found ${response.data.length} active employees`);
   });
 
   await test('DELETE /employees/{id} (Deactivate Employee)', async () => {
-    const response = await apiCall('DELETE', `/employees/${testState.employeeIds[1]}`, null, testState.accessToken);
+    const response = await apiCall('DELETE', `/employees/${testState.employeeIds[1]}`, null);
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Employee deactivated`);
   });
@@ -359,6 +410,13 @@ async function runTests() {
     });
     if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
     console.log(`  → Password reset request sent (check console logs)`);
+  });
+
+  await test('POST /auth/logout (Revoke Cookie Session)', async () => {
+    const response = await apiCall('POST', '/auth/logout');
+    if (response.status !== 200) throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(response.data)}`);
+    const afterLogout = await apiCall('GET', '/me');
+    if (afterLogout.status !== 401) throw new Error(`Expected 401 after logout, got ${afterLogout.status}`);
   });
 
   // ============= RESULTS =============

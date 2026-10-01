@@ -36,16 +36,17 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "summary": "Refresh access token using a refresh token",
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } }
-        },
+        "summary": "Rotate auth cookies using the refresh cookie",
         "responses": {
-          "200": { "description": "New tokens + fresh user/shop data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" },
+          "200": { "description": "Fresh user/shop data; rotated HttpOnly cookies are set" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Revoke the refresh session and clear auth cookies",
+        "responses": { "200": { "description": "Logged out successfully" } }
       }
     },
     "/api/auth/forgot-password": {
@@ -286,7 +287,7 @@
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+      "bearerAuth": { "type": "apiKey", "in": "cookie", "name": "sms_access" }
     },
     "parameters": {
       "EmployeeId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
@@ -312,9 +313,7 @@
           "success": { "type": "boolean" },
           "message": { "type": "string" },
           "user": { "$ref": "#/components/schemas/UserSummary" },
-          "shop": { "$ref": "#/components/schemas/ShopSummary" },
-          "accessToken": { "type": "string" },
-          "refreshToken": { "type": "string" }
+          "shop": { "$ref": "#/components/schemas/ShopSummary" }
         }
       },
       "LoginRequest": {
@@ -328,12 +327,9 @@
           "success": { "type": "boolean" },
           "message": { "type": "string" },
           "user": { "$ref": "#/components/schemas/UserSummary" },
-          "shop": { "$ref": "#/components/schemas/ShopSummary" },
-          "accessToken": { "type": "string" },
-          "refreshToken": { "type": "string" }
+          "shop": { "$ref": "#/components/schemas/ShopSummary" }
         }
       },
-      "RefreshRequest": { "type": "object", "required": ["refreshToken"], "properties": { "refreshToken": { "type": "string" } } },
       "ForgotPasswordRequest": {
         "type": "object",
         "required": ["email"],
@@ -375,7 +371,7 @@
           "name": { "type": "string" },
           "phone": { "type": "string" },
           "designation": { "type": "string" },
-          "payType": { "type": "string", "enum": ["HOURLY", "DAILY", "WEEKLY", "MONTHLY"] },
+          "payType": { "type": "string", "enum": ["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "PIECE_RATE"] },
           "payRate": { "type": "number" },
           "joiningDate": { "type": "string", "format": "date-time" }
         }
@@ -412,7 +408,8 @@
           "employeeId": { "type": "string" },
           "date": { "type": "string", "format": "date-time" },
           "status": { "type": "string", "enum": ["PRESENT", "ABSENT", "HALF_DAY", "ON_LEAVE"] },
-          "notes": { "type": "string" }
+          "notes": { "type": "string" },
+          "piecesCompleted": { "type": "integer", "minimum": 0, "description": "Units completed for piece-rate pay" }
         }
       },
       "Attendance": {
@@ -424,6 +421,7 @@
           "checkIn": { "type": "string", "format": "date-time", "nullable": true },
           "checkOut": { "type": "string", "format": "date-time", "nullable": true },
           "hoursWorked": { "type": "number", "nullable": true },
+          "piecesCompleted": { "type": "integer" },
           "status": { "type": "string" },
           "notes": { "type": "string", "nullable": true }
         }
@@ -439,6 +437,7 @@
         "properties": {
           "employee": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "payType": { "type": "string" } } },
           "totalHours": { "type": "number" },
+          "totalPieces": { "type": "integer" },
           "daysPresent": { "type": "integer" },
           "grossPay": { "type": "number" },
           "netPay": { "type": "number" }
@@ -452,6 +451,7 @@
           "periodStart": { "type": "string", "format": "date" },
           "periodEnd": { "type": "string", "format": "date" },
           "totalHours": { "type": "number", "nullable": true },
+          "totalPieces": { "type": "integer" },
           "daysPresent": { "type": "integer", "nullable": true },
           "grossPay": { "type": "number" },
           "netPay": { "type": "number" },

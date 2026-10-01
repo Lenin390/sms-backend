@@ -1,14 +1,12 @@
 const { verifyAccessToken } = require("../utils/token");
+const { ACCESS_COOKIE_NAME, readCookie } = require("../utils/authCookies");
 
 // Require a valid JWT for this route
 function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const token = readCookie(req, ACCESS_COOKIE_NAME);
+  if (!token) {
     return res.status(401).json({ success: false, message: "No token provided" });
   }
-
-  const token = authHeader.split(" ")[1];
 
   try {
     const decoded = verifyAccessToken(token);

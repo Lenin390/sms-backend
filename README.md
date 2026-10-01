@@ -34,6 +34,7 @@ JWT_ACCESS_EXPIRY=15m
 JWT_REFRESH_EXPIRY=7d
 NODE_ENV=development
 PORT=5000
+CORS_ORIGIN=http://localhost:5173
 ```
 
 ### 4. Initialize Database
@@ -42,7 +43,7 @@ PORT=5000
 npx prisma migrate dev --name init
 ```
 
-This creates all tables: User, Shop, Employee, Attendance, PayrollRun, Order, WorkAssignment, ActivityLog, PasswordResetToken
+This creates all tables: User, Shop, Employee, Attendance, PayrollRun, RefreshToken, Order, WorkAssignment, ActivityLog, PasswordResetToken
 
 ### 5. Start Server
 
@@ -59,7 +60,7 @@ API docs available at `http://localhost:5000/docs`
 node scripts/test_all_endpoints.js
 ```
 
-Expected: **30/30 tests passing (100%)**
+Expected: all endpoint checks passing (100%)
 
 ---
 
@@ -68,7 +69,7 @@ Expected: **30/30 tests passing (100%)**
 ### 🔐 Authentication & Authorization
 - Owner registration (creates User + Shop)
 - Single login for all roles (Owner, Manager, Staff)
-- JWT access + refresh tokens
+- HttpOnly cookie-based access and refresh tokens with refresh-token rotation
 - Role-based access control (RBAC)
 - Password reset with email tokens
 - Protected `/api/me` endpoint
@@ -87,7 +88,7 @@ Expected: **30/30 tests passing (100%)**
 - Attendance history with date range filters
 
 ### 💰 Payroll System
-- Calculate pay based on hours worked or attendance
+- Calculate pay by hours, attendance, or completed pieces
 - Preview payroll without saving
 - Create and save payroll runs
 - Mark payroll as paid with audit trail
@@ -141,11 +142,7 @@ http://localhost:5000/docs
 
 ## Authentication
 
-All protected endpoints require a Bearer token in the `Authorization` header:
-
-```
-Authorization: Bearer <accessToken>
-```
+Protected endpoints use the `sms_access` HttpOnly cookie. Login and registration set it automatically; browser clients must use `credentials: "include"` (or `withCredentials: true` in Axios). Configure `CORS_ORIGIN` with the exact frontend origin. Production cookies use `Secure` and `SameSite=None` by default; `AUTH_COOKIE_SAME_SITE` can override the same-site policy.
 
 ### Authentication Flow
 
@@ -154,12 +151,12 @@ Authorization: Bearer <accessToken>
    POST /api/auth/register
    ```
 
-2. **Login** to get tokens
+2. **Login** to set the auth cookies
    ```
    POST /api/auth/login
    ```
 
-3. **Use access token** for API requests (15 minutes expiry by default)
+3. **Use the cookies** for API requests (15-minute access-token expiry by default)
    ```
    GET /api/me
    ```
@@ -169,14 +166,7 @@ Authorization: Bearer <accessToken>
    POST /api/auth/refresh
    ```
 
-### Token Structure
-
-**Access Token** contains:
-- `id` - User ID
-- `shopId` - Associated shop ID  
-- `role` - User role (OWNER, MANAGER, STAFF)
-
-Tokens are JWT-based and verified on every protected request.
+`POST /api/auth/refresh` rotates the refresh cookie; its token is never accepted from or returned in JSON. `POST /api/auth/logout` revokes the current refresh session and clears both cookies. Unsafe requests authenticated by cookies must include an allowed `Origin` header.
 
 ## Response Format
 
@@ -324,11 +314,7 @@ POST /auth/register
   "shopAddress": "123 Main St"
 }
 
-// Response includes:
-// - accessToken (use for subsequent requests)
-// - refreshToken (use to get new accessToken when expired)
-// - user object with id and role
-// - shop object with id and name
+// Response includes user and shop data. Auth tokens are set as HttpOnly cookies.
 ```
 
 ### Workflow 2: Add and Manage Employees
@@ -336,7 +322,7 @@ POST /auth/register
 ```javascript
 // 1. Create employee (owner/manager only)
 POST /employees
-Authorization: Bearer <accessToken>
+// Send the auth cookies automatically (credentials: "include")
 {
   "name": "John Tailor",
   "phone": "9123456789",
@@ -383,7 +369,7 @@ POST /orders/<orderId>/assignments
 
 // 3. Employee updates task status
 PATCH /assignments/<assignmentId>
-Authorization: Bearer <employeeAccessToken>
+// Send the employee's auth cookies automatically
 {
   "status": "IN_PROGRESS"
 }
@@ -391,7 +377,7 @@ Authorization: Bearer <employeeAccessToken>
 
 // 4. Owner/manager can update anything
 PATCH /assignments/<assignmentId>
-Authorization: Bearer <ownerAccessToken>
+// Send the owner's auth cookies automatically
 {
   "status": "DONE",
   "notes": "Quality checked and approved"
@@ -435,6 +421,8 @@ PATCH /payroll/runs/<runId>/pay
 // Status changes from DRAFT to PAID
 // Activity log is updated
 ```
+
+For piece-rate employees, include a non-negative `piecesCompleted` integer when marking attendance. Payroll uses the total recorded pieces in the selected period multiplied by that employee's `payRate`.
 
 ## Database Models
 

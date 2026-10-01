@@ -35,6 +35,7 @@ model User {
   ownedShop    Shop?    @relation("ShopOwner")
   shop         Shop?    @relation("ShopStaff", fields: [shopId], references: [id], onDelete: Cascade)
   employee Employee?
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -86,6 +87,7 @@ model Attendance {
   checkIn     DateTime?
   checkOut    DateTime?
   hoursWorked Float?
+  piecesCompleted Int              @default(0)
   status      AttendanceStatus @default(PRESENT)
   notes       String?
   createdAt   DateTime         @default(now())
@@ -110,6 +112,7 @@ model PayrollRun {
   periodStart DateTime      @db.Date
   periodEnd   DateTime      @db.Date
   totalHours  Float?
+  totalPieces Int           @default(0)
   daysPresent Int?
   grossPay    Float
   netPay      Float
@@ -124,6 +127,19 @@ model PayrollRun {
 enum PayrollStatus {
   DRAFT
   PAID
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model Order {

@@ -4,6 +4,7 @@ const cors = require("cors");
 const swaggerUi = require("swagger-ui-express");
 const openapi = require("../openapi.json");
 const { errorHandler } = require("./middleware/errorHandler");
+const { verifyRequestOrigin } = require("./middleware/csrf");
 const authRoutes = require("./routes/authRoutes");
 const meRoutes = require("./routes/meRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
@@ -23,6 +24,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(verifyRequestOrigin);
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 

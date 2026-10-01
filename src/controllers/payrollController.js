@@ -44,7 +44,10 @@ async function previewPayroll(req, res) {
   );
 
   const breakdown = calculatePay(employee, attendanceRecords);
-  res.json({ employee: { id: employee.id, name: employee.name, payType: employee.payType }, ...breakdown });
+  res.json({
+    employee: { id: employee.id, name: employee.name, payType: employee.payType, payRate: employee.payRate },
+    ...breakdown,
+  });
 }
 
 // Actually saves the payroll run

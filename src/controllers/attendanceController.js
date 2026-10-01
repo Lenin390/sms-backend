@@ -5,8 +5,12 @@ const { validateRequest } = require("../utils/validation");
 
 function startOfDay(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+function endOfDay(date) {
+  const d = new Date(date);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 }
 
 async function checkIn(req, res) {
@@ -59,6 +63,7 @@ const markSchema = z.object({
   date: z.string().datetime().optional(),
   status: z.enum(["PRESENT", "ABSENT", "HALF_DAY", "ON_LEAVE"]),
   notes: z.string().optional(),
+  piecesCompleted: z.number().int().min(0).optional(),
 });
 
 // For daily/weekly/monthly employees who don't clock in - also doubles as
@@ -72,8 +77,18 @@ async function markAttendance(req, res) {
 
   const record = await prisma.attendance.upsert({
     where: { employeeId_date: { employeeId, date } },
-    create: { employeeId, date, status: data.status, notes: data.notes },
-    update: { status: data.status, notes: data.notes },
+    create: {
+      employeeId,
+      date,
+      status: data.status,
+      notes: data.notes,
+      piecesCompleted: data.piecesCompleted ?? 0,
+    },
+    update: {
+      status: data.status,
+      notes: data.notes,
+      ...(data.piecesCompleted !== undefined ? { piecesCompleted: data.piecesCompleted } : {}),
+    },
   });
 
   res.json(record);
@@ -99,7 +114,7 @@ async function listAttendance(req, res) {
         ? {
             date: {
               ...(from ? { gte: startOfDay(from) } : {}),
-              ...(to ? { lte: startOfDay(to) } : {}),
+              ...(to ? { lte: endOfDay(to) } : {}),
             },
           }
         : {}),
