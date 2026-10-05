@@ -8,6 +8,7 @@ const {
   getEmployeeSummary,
   updateEmployee,
   deactivateEmployee,
+  reactivateEmployee,
   grantLoginAccess,
 } = require("../controllers/employeeController");
 
@@ -20,6 +21,7 @@ router.get("/", asyncHandler(listEmployees));
 router.get("/:id", asyncHandler(getEmployee));
 router.get("/:id/summary", asyncHandler(getEmployeeSummary));
 router.patch("/:id", asyncHandler(updateEmployee));
+router.patch("/:id/reactivate", asyncHandler(reactivateEmployee));
 router.delete("/:id", asyncHandler(deactivateEmployee));
 router.post("/:id/grant-access", asyncHandler(grantLoginAccess));
 

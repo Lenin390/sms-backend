@@ -146,6 +146,7 @@ model Order {
   id             String      @id @default(uuid())
   shopId         String
   shop           Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  title          String?
   clientName     String
   clientPhone    String
   instructions   String?

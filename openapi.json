@@ -236,6 +236,13 @@
         "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
         "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderUpdateRequest" } } } },
         "responses": { "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "delete": {
+        "summary": "Delete an order and its work assignments",
+        "description": "Owner/manager only. Deleting an order permanently removes its assigned work records.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+        "responses": { "200": { "description": "Order deleted" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/api/orders/{orderId}/assignments": {
@@ -462,8 +469,9 @@
 
       "OrderRequest": {
         "type": "object",
-        "required": ["clientName", "clientPhone", "deliveryDate", "amount"],
+        "required": ["title", "clientName", "clientPhone", "deliveryDate", "amount"],
         "properties": {
+          "title": { "type": "string", "minLength": 2 },
           "clientName": { "type": "string" },
           "clientPhone": { "type": "string" },
           "instructions": { "type": "string" },
@@ -483,6 +491,7 @@
         "properties": {
           "id": { "type": "string" },
           "shopId": { "type": "string" },
+          "title": { "type": "string", "nullable": true },
           "clientName": { "type": "string" },
           "clientPhone": { "type": "string" },
           "instructions": { "type": "string", "nullable": true },
@@ -522,7 +531,15 @@
           "task": { "type": "string" },
           "status": { "type": "string", "enum": ["PENDING", "IN_PROGRESS", "DONE"] },
           "dueDate": { "type": "string", "format": "date-time", "nullable": true },
-          "notes": { "type": "string", "nullable": true }
+          "notes": { "type": "string", "nullable": true },
+          "order": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string", "nullable": true },
+              "clientName": { "type": "string" },
+              "deliveryDate": { "type": "string", "format": "date-time" }
+            }
+          }
         }
       },
 

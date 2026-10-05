@@ -90,7 +90,7 @@ async function listAssignments(req, res) {
     },
     include: {
       employee: { select: { name: true } },
-      order: { select: { clientName: true, deliveryDate: true } },
+      order: { select: { title: true, clientName: true, deliveryDate: true } },
     },
     orderBy: { createdAt: "desc" },
   });

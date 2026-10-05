@@ -4,6 +4,7 @@ const { validateRequest } = require("../utils/validation");
 const { logActivity } = require("../utils/activityLog");
 
 const orderSchema = z.object({
+  title: z.string().trim().min(2, "Order title must be at least 2 characters"),
   clientName: z.string().min(2, "Client name must be at least 2 characters"),
   clientPhone: z.string().min(7, "Invalid phone number"),
   instructions: z.string().optional(),
@@ -28,7 +29,7 @@ async function createOrder(req, res) {
     data: { ...data, shopId: req.auth.shopId },
   });
 
-  logActivity(req.auth.shopId, "ORDER_CREATED", `Order for ${order.clientName} created`);
+  logActivity(req.auth.shopId, "ORDER_CREATED", `Order ${order.title} for ${order.clientName} created`);
 
   res.status(201).json(withBalance(order));
 }
@@ -90,10 +91,24 @@ async function updateOrder(req, res) {
   });
 
   if (data.status === "DELIVERED" && existing.status !== "DELIVERED") {
-    logActivity(req.auth.shopId, "ORDER_DELIVERED", `Order for ${updated.clientName} delivered`);
+    logActivity(req.auth.shopId, "ORDER_DELIVERED", `Order ${updated.title || `for ${updated.clientName}`} completed`);
   }
 
   res.json(withBalance(updated));
 }
 
-module.exports = { createOrder, listOrders, getOrder, updateOrder };
+async function deleteOrder(req, res) {
+  const order = await prisma.order.findFirst({
+    where: { id: req.params.id, shopId: req.auth.shopId },
+  });
+  if (!order) {
+    return res.status(404).json({ success: false, message: "Order not found" });
+  }
+
+  await prisma.order.delete({ where: { id: order.id } });
+  logActivity(req.auth.shopId, "ORDER_DELETED", `Order ${order.title || `for ${order.clientName}`} deleted`);
+
+  res.json({ success: true, message: "Order deleted" });
+}
+
+module.exports = { createOrder, listOrders, getOrder, updateOrder, deleteOrder };

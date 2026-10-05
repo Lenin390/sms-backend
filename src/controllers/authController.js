@@ -98,7 +98,10 @@ async function login(req, res) {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { shop: { select: { id: true, name: true } } },
+    include: {
+      shop: { select: { id: true, name: true } },
+      employee: { select: { id: true } },
+    },
   });
 
   // never expose whether the user exists
@@ -119,7 +122,7 @@ async function login(req, res) {
   res.json({
     success: true,
     message: "Logged in successfully",
-    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, employeeId: user.employee?.id ?? null },
     shop: { id: user.shopId, name: user.shop?.name ?? null },
   });
 }
@@ -142,7 +145,14 @@ async function refresh(req, res) {
 
   const existingSession = await prisma.refreshToken.findUnique({
     where: { tokenHash: hashToken(refreshToken) },
-    include: { user: { include: { shop: { select: { id: true, name: true } } } } },
+    include: {
+      user: {
+        include: {
+          shop: { select: { id: true, name: true } },
+          employee: { select: { id: true } },
+        },
+      },
+    },
   });
   const user = existingSession?.user;
 
@@ -189,7 +199,7 @@ async function refresh(req, res) {
   return res.json({
     success: true,
     message: "Token refreshed successfully",
-    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, employeeId: user.employee?.id ?? null },
     shop: { id: user.shopId, name: user.shop?.name ?? null },
   });
 }

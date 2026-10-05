@@ -12,6 +12,14 @@ const employeeSchema = z.object({
   joiningDate: z.string().datetime().optional(),
 });
 
+function denyManagerSelfManagement(req, res, employee) {
+  if (req.auth.role === "MANAGER" && employee.linkedUserId === req.auth.id) {
+    res.status(403).json({ success: false, message: "You can't manage your own employee record" });
+    return true;
+  }
+  return false;
+}
+
 async function createEmployee(req, res) {
   const data = validateRequest(req, res, employeeSchema);
   if (!data) return;
@@ -109,6 +117,7 @@ async function updateEmployee(req, res) {
   if (!existing) {
     return res.status(404).json({ success: false, message: "Employee not found" });
   }
+  if (denyManagerSelfManagement(req, res, existing)) return;
 
   const updated = await prisma.employee.update({
     where: { id: existing.id },
@@ -126,6 +135,7 @@ async function deactivateEmployee(req, res) {
   if (!existing) {
     return res.status(404).json({ success: false, message: "Employee not found" });
   }
+  if (denyManagerSelfManagement(req, res, existing)) return;
 
   await prisma.employee.update({
     where: { id: existing.id },
@@ -133,6 +143,23 @@ async function deactivateEmployee(req, res) {
   });
 
   res.json({ success: true, message: "Employee deactivated" });
+}
+
+async function reactivateEmployee(req, res) {
+  const existing = await prisma.employee.findFirst({
+    where: { id: req.params.id, shopId: req.auth.shopId },
+  });
+  if (!existing) {
+    return res.status(404).json({ success: false, message: "Employee not found" });
+  }
+  if (denyManagerSelfManagement(req, res, existing)) return;
+
+  await prisma.employee.update({
+    where: { id: existing.id },
+    data: { isActive: true },
+  });
+
+  res.status(200).json({ success: true, message: "Employee reactivated" });
 }
 
 const bcrypt = require("bcrypt");
@@ -154,6 +181,10 @@ async function grantLoginAccess(req, res) {
   });
   if (!employee) {
     return res.status(404).json({ success: false, message: "Employee not found" });
+  }
+  if (denyManagerSelfManagement(req, res, employee)) return;
+  if (!employee.isActive) {
+    return res.status(409).json({ success: false, message: "Reactivate this employee before granting login access" });
   }
   if (employee.linkedUserId) {
     return res.status(409).json({ success: false, message: "This employee already has login access" });
@@ -199,5 +230,6 @@ module.exports = {
   getEmployeeSummary,
   updateEmployee,
   deactivateEmployee,
+  reactivateEmployee,
   grantLoginAccess,
 };
